@@ -1,0 +1,88 @@
+/.phpunit.cache
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+.env
+.env.backup
+.env.production
+.env.local
+.env.dev
+.phpactor.json
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+/auth.json
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+/.kiro
+
+# Laravel specific
+bootstrap/cache/packages.php
+bootstrap/cache/services.php
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+storage/app/*.php
+storage/media-library/*
+
+# Docker
+docker-compose.override.yml
+.docker/
+docker/*/data/
+docker/*/logs/
+docker/mysql/data/
+docker/mysql/logs/
+docker/nginx/logs/
+docker/supervisor/logs/
+
+# Build artifacts
+.vite/
+dist/
+build/
+coverage/
+.coverage/
+
+# OS generated files
+Thumbs.db
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Icon?
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# IDE specific
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+
+# Test coverage
+reports/
+phpunit-coverage.xml
+
+# Deployment logs
+deploy.log
+deploy-*.log
+
+docs
+foto-guru
+
+tests-results

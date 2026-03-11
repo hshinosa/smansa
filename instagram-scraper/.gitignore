@@ -1,0 +1,40 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environment
+.env
+venv/
+env/
+ENV/
+
+# Instaloader session files (contains auth tokens)
+session-*
+
+# Downloaded Instagram content
+downloads/
+*.jpg
+*.png
+*.mp4
+*.json
+
+# Database
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

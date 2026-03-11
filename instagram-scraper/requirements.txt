@@ -1,0 +1,19 @@
+# Instagram Scraper Dependencies
+# For SMAN 1 Baleendah News Feed Automation
+
+# Instagram scraping library with session management
+instaloader>=4.10.0
+
+# Database ORM and PostgreSQL adapter
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9
+
+# Environment variables management
+python-dotenv>=1.0.0
+
+# Additional utilities
+requests>=2.31.0
+pillow>=10.0.0
+
+# Optional: For advanced rate limiting and retry logic
+tenacity>=8.2.0

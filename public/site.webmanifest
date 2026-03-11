@@ -1,0 +1,36 @@
+{
+    "name": "SMAN 1 Baleendah",
+    "short_name": "SMANSA",
+    "description": "Website resmi SMAN 1 Baleendah - Sekolah Menengah Atas unggulan di Bandung",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#1e40af",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/images/logo-sman1baleendah.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/images/logo-sman1baleendah-32x32.png",
+            "sizes": "32x32",
+            "type": "image/png"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "PPDB",
+            "short_name": "PPDB",
+            "description": "Informasi PPDB SMAN 1 Baleendah",
+            "url": "/informasi-spmb"
+        },
+        {
+            "name": "Berita",
+            "short_name": "Berita",
+            "description": "Berita dan pengumuman terbaru",
+            "url": "/berita-pengumuman"
+        }
+    ]
+}
