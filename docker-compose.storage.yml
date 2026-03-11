@@ -1,0 +1,147 @@
+name: sman1baleendah-storage
+
+# Docker Compose dengan Storage Terpisah
+# Storage di-mount dari host ke container sebagai volume terpisah
+# Container hanya membaca, tidak menyimpan data di dalam image
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sman1baleendah-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      # STORAGE TERPISAH - Mount dari host (Windows path)
+      - /c/smansa-data:/var/www/storage/app/public
+      - ./docker/php-fpm/php.ini:/usr/local/etc/php/conf.d/custom.ini
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=production
+      - APP_KEY=${APP_KEY}
+      - DB_CONNECTION=pgsql
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-sman1_baleendah}
+      - DB_USERNAME=${DB_USERNAME:-sman1_user}
+      - DB_PASSWORD=${DB_PASSWORD:-sman1_password_2024}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_STORE=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_CONNECTION=database
+      # Storage configuration
+      - FILESYSTEM_DISK=public
+      - FILESYSTEM_ROOT=/var/www/storage/app/public
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sman1-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: sman1baleendah-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./public:/var/www/public:ro
+      # STORAGE TERPISAH - Nginx serve langsung dari volume
+      - /c/smansa-data:/var/www/storage/app/public:ro
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/sites/:/etc/nginx/sites-available
+      - ./docker/nginx/ssl/:/etc/nginx/ssl/:ro
+    depends_on:
+      - app
+    networks:
+      - sman1-network
+
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: sman1baleendah-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-sman1_baleendah}
+      POSTGRES_USER: ${DB_USERNAME:-sman1_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-sman1_password_2024}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - sman1-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-sman1_user} -d ${DB_DATABASE:-sman1_baleendah}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: sman1baleendah-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sman1-network
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-BuUyzCCiCIC3MhAkXzpyRtrEnFtHBeSK}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-BuUyzCCiCIC3MhAkXzpyRtrEnFtHBeSK}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: php artisan queue:work --sleep=1 --tries=3 --timeout=120 --queue=default,instagram
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      # STORAGE TERPISAH - Queue juga perlu akses
+      - /c/smansa-data:/var/www/storage/app/public
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=production
+      - DB_CONNECTION=pgsql
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-sman1_baleendah}
+      - DB_USERNAME=${DB_USERNAME:-sman1_user}
+      - DB_PASSWORD=${DB_PASSWORD:-sman1_password_2024}
+      - FILESYSTEM_DISK=public
+      - FILESYSTEM_ROOT=/var/www/storage/app/public
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sman1-network
+
+# NAMED VOLUMES - Storage terpisah dari container
+volumes:
+  smansa-storage:
+    driver: local
+  
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  sman1-network:
+    driver: bridge
