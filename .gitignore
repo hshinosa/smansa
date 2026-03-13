@@ -86,3 +86,7 @@ docs
 foto-guru
 
 tests-results
+
+# AI/Agent generated files
+.swarm/
+.agents/
