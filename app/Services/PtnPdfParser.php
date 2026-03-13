@@ -8,7 +8,7 @@ use App\Models\PtnUniversity;
 
 class PtnPdfParser
 {
-    protected $batchId;
+    protected ?int $batchId;
 
     public function __construct($batchId)
     {
