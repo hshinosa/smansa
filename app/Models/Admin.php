@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable; // Gunakan Authenticatable
+use Illuminate\Foundation\Auth\User as Authenticatable; // Use Authenticatable
 use Illuminate\Notifications\Notifiable;
 
 class Admin extends Authenticatable // Implement Authenticatable
@@ -38,7 +38,7 @@ class Admin extends Authenticatable // Implement Authenticatable
     protected function casts(): array
     {
         return [
-            'password' => 'hashed', // Pastikan password di-hash
+            'password' => 'hashed', // Ensure password is hashed
         ];
     }
 }

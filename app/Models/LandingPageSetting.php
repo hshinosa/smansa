@@ -74,7 +74,7 @@ class LandingPageSetting extends Model implements HasMedia
             'gallery_lp' => ['title', 'description', 'images'], // 'images' array of strings (urls)
             'cta_lp' => ['title', 'description'],
             'kalender_akademik' => ['title', 'description', 'calendar_image_url'],
-            // Tambahkan section lain jika ada
+            // Add other sections if available
         ];
     }
 
@@ -102,7 +102,7 @@ class LandingPageSetting extends Model implements HasMedia
                 'title' => 'Sambutan Kepala Sekolah',
                 'kepsek_name' => 'Drs. Ahmad Suryadi, M.Pd.',
                 'kepsek_title' => 'Kepala SMA Negeri 1 Baleendah',
-                'kepsek_image_url' => '/images/kepala-sekolah.jpg', // Pastikan path benar
+                'kepsek_image_url' => '/images/kepala-sekolah.jpg', // Ensure path is correct
                 'welcome_text_html' => '<p><strong>Sampurasun!</strong></p><p>Puji syukur senantiasa kita panjatkan kehadirat Allah SWT, Tuhan Yang Maha Esa, atas limpahan rahmat dan karunia-Nya. Saya menyambut Anda di situs resmi SMA Negeri 1 Baleendah, jendela informasi utama sekolah kami.</p><p>Kami berkomitmen untuk mengembangkan potensi peserta didik secara optimal melalui program MIPA, IPS, dan Bahasa serta membentuk karakter mulia. Mari bersama membangun masa depan yang gemilang.</p><p>Wassalamu’alaikum Warahmatullahi Wabarakatuh.</p>',
             ],
             'programs_lp' => [
@@ -150,7 +150,7 @@ class LandingPageSetting extends Model implements HasMedia
                 'title' => 'Kalender Akademik SMA Negeri 1 Baleendah',
                 'description' => 'Kalender akademik resmi yang ditetapkan oleh pemerintah untuk tahun ajaran ini.',
             ],
-            // Tambahkan default untuk section lain
+            // Add defaults for other sections
         ];
 
         return $defaults[$sectionKey] ?? [];

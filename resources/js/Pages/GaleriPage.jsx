@@ -1,22 +1,21 @@
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 import { Head, Link } from '@inertiajs/react';
 import { Search, ChevronLeft, ChevronRight, X, Play, Image as ImageIcon } from 'lucide-react';
 
 // Import Components
 import Navbar from '@/Components/Navbar';
 import Footer from '@/Components/Footer';
-import Modal from '@/Components/Modal';
-import ResponsiveImage, { GalleryImage } from '@/Components/ResponsiveImage';
+import ResponsiveImage from '@/Components/ResponsiveImage';
 import { normalizeUrl } from '@/Utils/imageUtils';
 
 // Import utilities
 import { TYPOGRAPHY } from '@/Utils/typography';
-import { getNavigationData } from '@/Utils/navigationData';
-import { usePage } from '@inertiajs/react';
+import { useNavigation, useHeroSettings } from '@/Hooks';
+import { useSearchFilter, usePagination, useLightbox } from '@/Hooks';
 
 const GalleryThumbnail = ({ item }) => {
-    const [imgSrc, setImgSrc] = useState('');
-    const [hasError, setHasError] = useState(false);
+    const [imgSrc, setImgSrc] = React.useState('');
+    const [hasError, setHasError] = React.useState(false);
 
     // Determine initial image source
     React.useEffect(() => {

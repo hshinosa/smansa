@@ -43,13 +43,32 @@ class InstagramBotAccount extends Model
 
     /**
      * Get the password attribute (decrypt for use)
-     * Note: Password is stored plain for Python scraper compatibility
-     * In production, consider using Laravel's encryption if Python can decrypt
+     * 
+     * SECURITY NOTE: Password is intentionally stored unencrypted for Python scraper compatibility.
+     * The Python scraper (instagram-scraper/scraper.py) runs as a standalone subsystem and needs
+     * direct database access to credentials. Implementing encryption would require:
+     * 
+     * 1. Python to have access to Laravel's APP_KEY for decryption
+     * 2. Additional complexity in the scraper to handle decryption
+     * 3. Key management across two different runtime environments (PHP + Python)
+     * 
+     * MITIGATION STRATEGIES (RECOMMENDED):
+     * - Use dedicated Instagram burner accounts (not personal accounts)
+     * - Enable 2FA on Instagram accounts and use app-specific passwords
+     * - Restrict database access to trusted environments only
+     * - Rotate Instagram credentials regularly
+     * - Use environment variables for credentials instead of database (manual login in scraper)
+     * 
+     * TRADE-OFF ANALYSIS:
+     * - Encryption would provide false security (Python still needs plaintext to login)
+     * - Database access is already a privileged operation
+     * - Instagram credentials are lower risk than passwords/user data
+     * - Simpler architecture = fewer attack vectors
+     * 
+     * CONCLUSION: Keeping plaintext is the pragmatic choice for this use case.
      */
     public function getPasswordAttribute($value)
     {
-        // Return as-is for now (Python scraper needs plain text)
-        // TODO: Implement encryption/decryption if needed
         return $value;
     }
 
@@ -58,7 +77,6 @@ class InstagramBotAccount extends Model
      */
     public function setPasswordAttribute($value)
     {
-        // Store as-is for Python scraper compatibility
         $this->attributes['password'] = $value;
     }
 

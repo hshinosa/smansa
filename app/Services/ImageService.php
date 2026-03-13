@@ -157,6 +157,80 @@ class ImageService
     }
 
     /**
+     * Transform a single post with media for listing views
+     * Tries collections in order and falls back to database field
+     *
+     * @param mixed $post
+     * @param array $collections Ordered list of collection names to try
+     * @return array
+     */
+    public function transformPostWithMedia($post, array $collections = ['featured', 'gallery']): array
+    {
+        $data = $post->toArray();
+        $media = null;
+
+        // Try each collection in order
+        foreach ($collections as $collection) {
+            $media = $this->getFirstMediaData($post, $collection);
+            if ($media) {
+                break;
+            }
+        }
+
+        if ($media) {
+            $data['image'] = $media;
+            $data['featured_image'] = $media['original_url'];
+        } else {
+            // Final fallback to database field - only if it's a full URL
+            $data['featured_image'] = $post->featured_image
+                ? (str_starts_with($post->featured_image, 'http') ? $post->featured_image : null)
+                : null;
+        }
+
+        return $data;
+    }
+
+    /**
+     * Transform a single post with media for detail views (includes gallery)
+     *
+     * @param mixed $post
+     * @param array $collections Ordered list of collection names to try for featured image
+     * @return array
+     */
+    public function transformPostDetailWithMedia($post, array $collections = ['featured', 'gallery']): array
+    {
+        $data = $this->transformPostWithMedia($post, $collections);
+
+        // For detail view, also include gallery images if they exist
+        $galleryMedia = $this->getAllMediaData($post, 'gallery');
+        if (!empty($galleryMedia)) {
+            $data['galleryImages'] = $galleryMedia;
+        }
+
+        // Rename 'image' to 'featuredImage' for detail view consistency
+        if (isset($data['image'])) {
+            $data['featuredImage'] = $data['image'];
+            unset($data['image']);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Transform a collection of posts with media
+     *
+     * @param Collection $posts
+     * @param array $collections Ordered list of collection names to try
+     * @return Collection
+     */
+    public function transformPostsCollection(Collection $posts, array $collections = ['featured', 'gallery']): Collection
+    {
+        return $posts->map(function ($post) use ($collections) {
+            return $this->transformPostWithMedia($post, $collections);
+        });
+    }
+
+    /**
      * Get fallback image path
      *
      * @param string $type

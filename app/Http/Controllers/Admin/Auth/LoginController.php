@@ -12,33 +12,33 @@ use Inertia\Inertia;
 class LoginController extends Controller
 {
     /**
-     * Menampilkan halaman login admin.
+     * Display admin login page.
      */
     public function create()
     {
-        // Pastikan guest admin, jika sudah login, redirect
+        // Ensure admin is guest, if already logged in, redirect
         if (Auth::guard('admin')->check()) {
-            return redirect()->route('admin.dashboard'); // Buat rute ini nanti
+            return redirect()->route('admin.dashboard'); // Create this route later
         }
 
         return Inertia::render('Admin/Auth/LoginPage');
     }
 
     /**
-     * Menangani upaya login admin.
+     * Handle admin login attempt.
      */
     public function store(AdminLoginRequest $request)
     {
         if (Auth::guard('admin')->attempt($request->validated(), $request->filled('remember'))) {
             $request->session()->regenerate();
-
-            // Redirect ke dashboard admin setelah login berhasil
-            return redirect()->intended(route('admin.dashboard')); // Buat rute ini nanti
+            
+            // Redirect to dashboard after successful login
+            return redirect()->intended(route('admin.dashboard')); // Create this route later
         }
 
-        // Jika login gagal
+        // If login fails
         throw ValidationException::withMessages([
-            'email' => [trans('auth.failed')], // Pesan error standar Laravel
+            'email' => [trans('auth.failed')], // Standard Laravel error message
         ]);
     }
 

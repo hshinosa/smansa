@@ -488,19 +488,19 @@ class DatabaseContentRagSyncService
     {
         $lines = [];
         
-        // Nama guru
+        // Teacher name
         $lines[] = "Nama: {$model->name}";
         
-        // Tipe (Guru/Staff)
+        // Type (Guru/Staff)
         $typeLabel = $model->type === 'staff' ? 'Staff/Tata Usaha' : 'Guru';
         $lines[] = "Jenis: {$typeLabel}";
         
-        // Jabatan/Posisi
+        // Position/Role
         if ($model->position) {
             $lines[] = "Jabatan: {$model->position}";
         }
         
-        // Departemen/Jurusan
+        // Department/Major
         if ($model->department) {
             $lines[] = "Departemen/Jurusan: {$model->department}";
         }
@@ -509,7 +509,7 @@ class DatabaseContentRagSyncService
         $status = $model->is_active ? 'Aktif' : 'Tidak Aktif';
         $lines[] = "Status: {$status}";
         
-        // Tambahkan konteks tambahan untuk pencarian
+        // Add additional context for search
         $lines[] = "";
         $lines[] = "Deskripsi:";
         $lines[] = "{$model->name} adalah {$typeLabel} di SMAN 1 Baleendah.";

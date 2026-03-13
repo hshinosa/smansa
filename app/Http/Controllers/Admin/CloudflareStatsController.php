@@ -30,8 +30,8 @@ class CloudflareStatsController extends Controller
         $this->zoneId = env('CLOUDFLARE_ZONE_ID');
     }
 
-    // Fungsi ini sekarang lebih generik, mengambil data berdasarkan start dan end datetime
-    // dan query yang diberikan. Ini akan dipakai untuk data harian dan per jam.
+    // This function is now more generic, fetching data based on start and end datetime
+    // and the given query. This will be used for daily and hourly data.
     private function fetchCloudflareVisits(Carbon $startDatetime, Carbon $endDatetime, string $timeGroupNode = 'httpRequestsAdaptiveGroups', string $limit = '100'): ?array
     {
         if (empty($this->apiToken) || empty($this->authEmail) || empty($this->zoneId)) {
@@ -40,7 +40,7 @@ class CloudflareStatsController extends Controller
             return null;
         }
 
-        // Pengecekan batasan umur data untuk permintaan yang lebih dari 1 hari yang lalu
+        // Check data age limit for requests older than 1 day
         if ($startDatetime->lt(now()->subDays(self::MAX_DATA_AGE_DAYS)->startOfDay())) {
             Log::warning('Data request for period starting '.$startDatetime->toDateTimeString().' exceeds retention limit.');
 
@@ -48,11 +48,11 @@ class CloudflareStatsController extends Controller
         }
 
         $startIso = $startDatetime->toIso8601String();
-        $endIso = $endDatetime->toIso8601String(); // Untuk datetime_lt, ini harusnya eksklusif
+        $endIso = $endDatetime->toIso8601String(); // For datetime_lt, this should be exclusive
 
-        // Query disesuaikan untuk bisa menerima node grouping yang berbeda
-        // Dan meminta 'dimensions { datetimeMinute }' atau 'dimensions { datetimeHour }' jika ada
-        // Untuk httpRequestsAdaptiveGroups, kita tetap ambil 'datetime' dan proses di PHP
+        // Query adjusted to accept different grouping nodes
+        // And request 'dimensions { datetimeMinute }' or 'dimensions { datetimeHour }' if available
+        // For httpRequestsAdaptiveGroups, we still fetch 'datetime' and process in PHP
         $graphqlQuery = <<<GRAPHQL
         query GetAggregatedVisits(\$zoneTag: String!, \$startDatetime: String!, \$endDatetime: String!) {
           viewer {
@@ -112,7 +112,7 @@ class CloudflareStatsController extends Controller
 
             $adaptiveGroups = $data['data']['viewer']['zones'][0]['httpRequestsAdaptiveGroups'] ?? [];
 
-            return ['groups' => $adaptiveGroups]; // Kembalikan semua grup untuk diproses lebih lanjut
+            return ['groups' => $adaptiveGroups]; // Return all groups for further processing
 
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             Log::error("CF Connection Exception (fetchCloudflareVisits) for {$startIso} to {$endIso}: ".$e->getMessage());
@@ -147,7 +147,7 @@ class CloudflareStatsController extends Controller
             $successfulFetches = 0;
             for ($i = $effectivePeriodDays - 1; $i >= 0; $i--) {
                 $currentDate = now()->subDays($i);
-                $dailyResult = $this->fetchCloudflareVisits($currentDate->copy()->startOfDay(), $currentDate->copy()->endOfDay()->addSecond()); // Ambil untuk sepanjang hari
+                $dailyResult = $this->fetchCloudflareVisits($currentDate->copy()->startOfDay(), $currentDate->copy()->endOfDay()->addSecond()); // Fetch for the entire day
 
                 if ($dailyResult !== null && ! isset($dailyResult['error'])) {
                     $dayVisits = 0;
@@ -207,15 +207,15 @@ class CloudflareStatsController extends Controller
             $chartData = ['labels' => [], 'data' => [], 'errors_detail' => [], 'fetch_error_count' => 0, 'period_type' => 'daily'];
             $fetchErrorCount = 0;
 
-            if ($periodParam === '1d') { // Data per jam untuk 1 hari terakhir
+            if ($periodParam === '1d') { // Hourly data for the last 1 day
                 $chartData['period_type'] = 'hourly';
                 $today = now();
-                // Ambil data untuk 24 jam terakhir, per jam
-                for ($hour = 23; $hour >= 0; $hour--) { // Loop dari jam 23 ke 0 untuk urutan di chart
+                // Fetch data for the last 24 hours, per hour
+                for ($hour = 23; $hour >= 0; $hour--) { // Loop from hour 23 to 0 for chart order
                     $currentHourStart = $today->copy()->subHours($hour)->startOfHour();
-                    $currentHourEnd = $today->copy()->subHours($hour)->endOfHour()->addSecond(); // sampai akhir jam tersebut (eksklusif di query <)
+                    $currentHourEnd = $today->copy()->subHours($hour)->endOfHour()->addSecond(); // until end of that hour (exclusive in query <)
 
-                    // Jangan ambil data lebih tua dari MAX_DATA_AGE_DAYS (meskipun untuk 1 hari ini tidak relevan)
+                    // Don't fetch data older than MAX_DATA_AGE_DAYS (although not relevant for 1 day)
                     if ($currentHourStart->lt(now()->subDays(self::MAX_DATA_AGE_DAYS)->startOfDay())) {
                         $chartData['labels'][] = $currentHourStart->isoFormat('HH:[00]');
                         $chartData['data'][] = 0;
@@ -226,7 +226,7 @@ class CloudflareStatsController extends Controller
                     }
 
                     $hourlyResult = $this->fetchCloudflareVisits($currentHourStart, $currentHourEnd);
-                    $chartData['labels'][] = $currentHourStart->isoFormat('HH:[00]'); // Label: 00:00, 01:00, dst.
+                    $chartData['labels'][] = $currentHourStart->isoFormat('HH:[00]'); // Label: 00:00, 01:00, etc.
 
                     if ($hourlyResult !== null && ! isset($hourlyResult['error'])) {
                         $hourVisits = 0;
@@ -237,17 +237,17 @@ class CloudflareStatsController extends Controller
                     } else {
                         $chartData['data'][] = 0;
                         $fetchErrorCount++;
-                        $errorMessage = $hourlyResult['error'] ?? 'Gagal ambil data per jam';
+                        $errorMessage = $hourlyResult['error'] ?? 'Failed to fetch hourly data';
                         $chartData['errors_detail'][] = ['hour' => $currentHourStart->toDateTimeString(), 'error' => $errorMessage];
                     }
                     if ($hour > 0) {
                         usleep(100000);
-                    } // Jeda kecil antar panggilan per jam
+                    } // Small pause between hourly calls
                 }
-                $chartData['labels'] = array_reverse($chartData['labels']); // Balik urutan label
-                $chartData['data'] = array_reverse($chartData['data']);     // Balik urutan data
+                $chartData['labels'] = array_reverse($chartData['labels']); // Reverse label order
+                $chartData['data'] = array_reverse($chartData['data']);     // Reverse data order
 
-            } else { // Data per hari untuk 7d atau MAX_DATA_AGE_DAYS
+            } else { // Daily data for 7d or MAX_DATA_AGE_DAYS
                 $chartData['period_type'] = 'daily';
                 $days = ($periodParam === '7d') ? 7 : self::MAX_DATA_AGE_DAYS;
                 for ($i = $days - 1; $i >= 0; $i--) {

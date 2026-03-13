@@ -84,45 +84,13 @@ class LandingPageController extends Controller
                 return $finalContent;
             };
 
-            // Definisikan default
-            $defaultHero = [
-                'title_line1' => 'Selamat Datang di',
-                'title_line2' => 'SMA Negeri 1 Baleendah',
-                'hero_text' => 'Sekolah penggerak prestasi dan inovasi masa depan. Kami berkomitmen mencetak lulusan yang cerdas, berakhlak mulia, dan siap bersaing di era global.',
-                'background_image_url' => '/images/hero-bg-sman1baleendah.jpeg',
-                'student_image_url' => '/images/anak-sma.png',
-                'stats' => [
-                    ['label' => 'Akreditasi', 'value' => 'A', 'icon' => 'Trophy'],
-                    ['label' => 'Lulusan', 'value' => '15k+', 'icon' => 'GraduationCap'],
-                    ['label' => 'Siswa Aktif', 'value' => '1.2k+', 'icon' => 'Users'],
-                ]
-            ];
-            $defaultAbout = [
-                'title' => 'Tentang Kami',
-                'description_html' => '<p>SMAN 1 Baleendah berdiri sejak tahun 1975 dan telah menjadi salah satu sekolah rujukan di Jawa Barat. Dengan visi menjadi sekolah unggul dalam prestasi dan berwawasan lingkungan, kami terus berinovasi dalam pembelajaran berbasis teknologi dan penguatan karakter.</p><p>Kami percaya bahwa setiap siswa memiliki potensi unik yang perlu dikembangkan melalui bimbingan yang tepat dan fasilitas yang memadai.</p>',
-                'image_url' => '/images/hero-bg-sman1baleendah.jpeg',
-            ];
-            $defaultKepsek = [
-                'title' => 'Sambutan Kepala Sekolah',
-                'kepsek_name' => 'Drs. H. Ahmad Suryadi, M.Pd.',
-                'kepsek_title' => 'Kepala SMA Negeri 1 Baleendah',
-                'kepsek_image_url' => '/images/hero-bg-sman1baleendah.jpeg', // Fallback to available image
-                'welcome_text_html' => '<p>Assalamu\'alaikum Warahmatullahi Wabarakatuh...</p><p>Saya mewakili seluruh warga SMA Negeri 1 Baleendah menyampaikan terima kasih atas kunjungan Anda ke website resmi kami...</p><p>Hormat kami,</p>',
-            ];
-            $defaultPrograms = [
-                'title' => 'Program Akademik',
-                'description' => 'Berbagai program inovatif yang dirancang untuk mengembangkan potensi siswa secara holistik.',
-            ];
-            $defaultGallery = [
-                'title' => 'Galeri Sekolah',
-                'description' => 'Momen-momen seru dan kegiatan inspiratif siswa-siswi SMAN 1 Baleendah.',
-            ];
-            $defaultCta = [
-                'title' => 'Siap Menjadi Bagian dari Keluarga Besar SMAN 1 Baleendah?',
-                'description' => 'Dapatkan informasi lengkap mengenai pendaftaran peserta didik baru, jadwal, dan persyaratan yang dibutuhkan.',
-                'button_text' => 'Daftar Sekarang',
-                'button_link' => '/informasi-spmb'
-            ];
+            // Load default values from config
+            $defaultHero = config('landing-page.hero');
+            $defaultAbout = config('landing-page.about');
+            $defaultKepsek = config('landing-page.kepsek');
+            $defaultPrograms = config('landing-page.programs');
+            $defaultGallery = config('landing-page.gallery');
+            $defaultCta = config('landing-page.cta');
 
             $latestPosts = $this->getLatestPosts();
 
@@ -248,22 +216,14 @@ class LandingPageController extends Controller
      */
     protected function getLatestPosts(): array
     {
-        return Post::where('status', 'published')
+        $posts = Post::where('status', 'published')
             ->where('published_at', '<=', now())
             ->latest('published_at')
             ->take(3)
             ->with('media')
-            ->get()
-            ->map(function ($post) {
-                $data = $post->toArray();
-                $media = $this->imageService->getFirstMediaData($post, 'featured');
-                if ($media) {
-                    $data['featuredImage'] = $media;
-                    $data['featured_image'] = $media['original_url'];
-                }
-                return $data;
-            })
-            ->toArray();
+            ->get();
+
+        return $this->imageService->transformPostsCollection($posts)->toArray();
     }
 
     /**

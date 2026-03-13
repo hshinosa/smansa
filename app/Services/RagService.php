@@ -381,7 +381,7 @@ class RagService
             // Check if this is a list query for teachers
             $isTeacherListQuery = $this->isTeacherListQuery($queryLower);
             
-            // Jika query tentang program/jurusan (IPA/IPS/Bahasa), jangan tampilkan daftar guru
+            // If query is about program/major (IPA/IPS/Bahasa), don't show teacher list
             $isProgramQuery = str_contains($queryLower, 'mipa') || str_contains($queryLower, 'ipa') || 
                 str_contains($queryLower, 'ips') || str_contains($queryLower, 'bahasa') ||
                 str_contains($queryLower, 'jurusan') || str_contains($queryLower, 'program') ||
@@ -456,9 +456,9 @@ class RagService
                 }
             }
             
-            // Jika query tentang program (IPA/IPS/Bahasa), cari info program bukan guru
+            // If query is about program (IPA/IPS/Bahasa), search for program info not teachers
             if ($isProgramQuery) {
-                // Map query IPA ke MIPA untuk pencarian
+                // Map IPA query to MIPA for search
                 $searchTerms = [$queryLower];
                 if (str_contains($queryLower, 'ipa') && !str_contains($queryLower, 'mipa')) {
                     $searchTerms[] = 'mipa';
@@ -1015,7 +1015,7 @@ class RagService
         }
 
         // Check for teacher/guru list queries
-        // Hanya trigger jika query spesifik tentang guru/staff/manajemen
+        // Only trigger if query is specifically about teachers/staff/management
         $isTeacherQuery = str_contains($query, ' daftar guru') || str_contains($query, 'list guru') || 
             str_contains($query, 'siapa guru') || str_contains($query, 'siapa saja guru') ||
             str_contains($query, 'tenaga pendidik') || 
