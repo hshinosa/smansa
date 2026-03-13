@@ -90,3 +90,4 @@ tests-results
 # AI/Agent generated files
 .swarm/
 .agents/
+.sisyphus/

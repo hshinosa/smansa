@@ -2,12 +2,16 @@
 
 use App\Http\Controllers\AcademicCalendarPublicController;
 use App\Http\Controllers\Admin\AcademicCalendarController;
+use App\Http\Controllers\Admin\AiSettingActionController;
 use App\Http\Controllers\Admin\CurriculumController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\Auth\LoginController as AdminLoginController;
 use App\Http\Controllers\Admin\CloudflareStatsController;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\IndexController;
 use App\Http\Controllers\Admin\LandingPageContentController;
 use App\Http\Controllers\Admin\SpmbContentController;
+use App\Http\Controllers\MediaProxyController;
 use App\Http\Controllers\Public\AkademikController;
 use App\Http\Controllers\Public\AlumniController;
 use App\Http\Controllers\Public\BeritaController;
@@ -19,8 +23,8 @@ use App\Http\Controllers\Public\PrestasiController;
 use App\Http\Controllers\Public\ProfilController;
 use App\Http\Controllers\Public\ProgramStudiController;
 use App\Http\Controllers\Public\SpmbController;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\RedirectController;
+use App\Http\Controllers\ScrapedImageController;
 use Illuminate\Support\Facades\Route;
 
 // ============================================================================
@@ -43,12 +47,10 @@ Route::get('/struktur-organisasi', [ProfilController::class, 'strukturOrganisasi
 
 // Academic Achievement
 Route::get('/akademik/prestasi-akademik', [PrestasiController::class, 'index'])->name('prestasi.akademik');
-Route::get('/akademik/prestasi-akademik/serapan-ptn', function () {
-    return redirect()->route('prestasi.akademik', [], 301);
-})->name('prestasi.serapan-ptn');
-Route::get('/akademik/prestasi-akademik/hasil-tka', function () {
-    return redirect()->route('prestasi.akademik', [], 301);
-})->name('hasil.tka');
+Route::get('/akademik/prestasi-akademik/serapan-ptn', [RedirectController::class, 'serapanPtn'])
+    ->name('prestasi.serapan-ptn');
+Route::get('/akademik/prestasi-akademik/hasil-tka', [RedirectController::class, 'hasilTka'])
+    ->name('hasil.tka');
 
 // Academic Pages
 Route::get('/akademik/ekstrakurikuler', [AkademikController::class, 'ekstrakurikuler'])->name('akademik.ekstrakurikuler');
@@ -87,22 +89,14 @@ Route::get('/guru-staff', [GuruStaffController::class, 'index'])->name('guru.sta
 Route::get('/seragam', [\App\Http\Controllers\Public\SeragamController::class, 'index'])->name('seragam');
 
 // Login redirect
-Route::get('/login', function () {
-    return redirect()->route('admin.login.form');
-})->name('login');
+Route::get('/login', [RedirectController::class, 'login'])->name('login');
 
 // ============================================================================
 // ADMIN ROUTES
 // ============================================================================
 Route::prefix('admin')->name('admin.')->group(function () {
     // Base route for /admin
-    Route::get('/', function () {
-        if (Auth::guard('admin')->check()) {
-            return redirect()->route('admin.dashboard');
-        }
-
-        return redirect()->route('admin.login.form');
-    })->name('index');
+    Route::get('/', [IndexController::class, 'index'])->name('index');
 
     // Login routes
     Route::get('/login', [AdminLoginController::class, 'create'])
@@ -118,14 +112,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         ->name('logout');
 
     // Dashboard
-    Route::get('/dashboard', function () {
-        $unreadMessagesCount = \App\Models\ContactMessage::where('is_read', false)->count();
-        
-        return Inertia\Inertia::render('Admin/DashboardPage', [
-            'admin' => Auth::guard('admin')->user(),
-            'unreadMessagesCount' => $unreadMessagesCount,
-        ]);
-    })->middleware('auth:admin')->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->middleware('auth:admin')
+        ->name('dashboard');
 
     // Protected Admin Routes
     Route::middleware('auth:admin')->group(function () {
@@ -203,10 +192,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/ai-settings/models', [\App\Http\Controllers\Admin\AiSettingController::class, 'models'])->name('ai-settings.models');
 
         // RAG DB Content Indexing
-        Route::post('/ai-settings/reindex-db-content', function () {
-            Artisan::queue('rag:reindex-db-content');
-            return back()->with('success', 'Reindex database content dimulai di queue.');
-        })->name('ai-settings.reindex-db-content');
+        Route::post('/ai-settings/reindex-db-content', [AiSettingActionController::class, 'reindexDbContent'])
+            ->name('ai-settings.reindex-db-content');
 
         // Instagram Bot Management
         Route::get('/instagram-bots', [\App\Http\Controllers\Admin\InstagramBotAccountController::class, 'index'])->name('instagram-bots.index');
@@ -265,45 +252,17 @@ Route::prefix('api')->name('api.')->group(function () {
 // ============================================================================
 // INSTAGRAM SCRAPER IMAGES ROUTE
 // ============================================================================
-Route::get('/scraped-images/{path}', function ($path) {
-    $fullPath = base_path('instagram-scraper/downloads/' . $path);
-    
-    if (!file_exists($fullPath)) {
-        abort(404);
-    }
-    
-    // Security: only allow image files
-    $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-    $extension = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
-    
-    if (!in_array($extension, $allowedExtensions)) {
-        abort(403);
-    }
-    
-    return response()->file($fullPath);
-})->where('path', '.*')->name('scraped-images');
+Route::get('/scraped-images/{path}', [ScrapedImageController::class, 'show'])
+    ->where('path', '.*')
+    ->name('scraped-images');
 
 // ============================================================================
 // MEDIA LIBRARY PROXY ROUTE
 // Workaround for PHP built-in server 403 error on filenames with parentheses
 // ============================================================================
-Route::get('/media/{path}', function ($path) {
-    $fullPath = storage_path('app/public/' . $path);
-    
-    // Security: ensure path is within storage/app/public
-    $realBase = realpath(storage_path('app/public'));
-    $realPath = realpath($fullPath);
-    
-    if (!$realPath || !str_starts_with($realPath, $realBase)) {
-        abort(404);
-    }
-    
-    if (!file_exists($realPath)) {
-        abort(404);
-    }
-    
-    return response()->file($realPath);
-})->where('path', '.*')->name('media.proxy');
+Route::get('/media/{path}', [MediaProxyController::class, 'show'])
+    ->where('path', '.*')
+    ->name('media.proxy');
 
 // ============================================================================
 // SEO ROUTES
