@@ -8,6 +8,7 @@ use App\Models\SiteSetting;
 use App\Services\ChatCacheService;
 use App\Services\RagService;
 use App\Services\AiSettingsService;
+use App\Http\Requests\ChatMessageRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -28,7 +29,7 @@ class ChatController extends Controller
     /**
      * Send message to chatbot with streaming support
      */
-    public function sendMessage(Request $request, ChatCacheService $cache)
+    public function sendMessage(ChatMessageRequest $request, ChatCacheService $cache)
     {
         $requestId = uniqid('chat_', true);
         $startTime = microtime(true);
@@ -38,12 +39,7 @@ class ChatController extends Controller
             'timestamp' => now()->toIso8601String(),
         ]);
 
-        $validated = $request->validate([
-            'message' => 'required|string|max:2000',
-            'session_id' => 'nullable|string|max:255',
-            'stream' => 'nullable|boolean',
-            'use_cache' => 'nullable|boolean',
-        ]);
+        $validated = $request->validated();
 
         // Validate and sanitize session_id
         $sessionId = $validated['session_id'] ?? null;

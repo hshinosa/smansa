@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PtnUniversity;
 use App\Models\PtnAdmissionBatch;
 use App\Models\PtnAdmission;
+use App\Http\Requests\PtnAdmissionImportRequest;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
@@ -203,12 +204,8 @@ class PtnAdmissionController extends Controller
         return back()->with('success', 'PTN berhasil dihapus.');
     }
 
-    public function importExcel(Request $request, PtnAdmissionBatch $batch)
+    public function importExcel(PtnAdmissionImportRequest $request, PtnAdmissionBatch $batch)
     {
-        $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv,pdf|max:5120',
-        ]);
-
         try {
             $file = $request->file('file');
             $extension = $file->getClientOriginalExtension();

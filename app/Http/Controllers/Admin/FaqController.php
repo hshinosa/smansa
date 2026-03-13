@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Faq;
+use App\Http\Requests\FaqReorderRequest;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -47,10 +48,9 @@ class FaqController extends Controller
         return redirect()->route('admin.faqs.index')->with('success', 'FAQ berhasil dihapus.');
     }
 
-    public function reorder(Request $request)
+    public function reorder(FaqReorderRequest $request)
     {
-        $request->validate(['items' => 'required|array']);
-        foreach ($request->input('items') as $index => $id) {
+        foreach ($request->validated() as $index => $id) {
             Faq::where('id', $id)->update(['sort_order' => $index + 1]);
         }
         return back()->with('success', 'Urutan berhasil diperbarui.');

@@ -233,23 +233,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
 });
 
 // ============================================================================
-// API ROUTES FOR CHATBOT
-// ============================================================================
-Route::prefix('api')->name('api.')->group(function () {
-    Route::post('/chat/send', [\App\Http\Controllers\Api\ChatController::class, 'sendMessage'])
-        ->middleware('throttle:ai_chat')
-        ->name('chat.send');
-    
-    Route::get('/chat/history', [\App\Http\Controllers\Api\ChatController::class, 'getHistory'])
-        ->name('chat.history');
-
-    // Security: CSP Reporting
-    Route::post('/security/csp-report', [\App\Http\Controllers\SecurityController::class, 'handleCspReport'])
-        ->middleware('throttle:security_report')
-        ->name('security.csp-report');
-});
-
-// ============================================================================
 // INSTAGRAM SCRAPER IMAGES ROUTE
 // ============================================================================
 Route::get('/scraped-images/{path}', [ScrapedImageController::class, 'show'])

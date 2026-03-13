@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Admin\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\AdminLoginRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
-use Inertia\Inertia; // Untuk error login
+use Inertia\Inertia;
 
 class LoginController extends Controller
 {
@@ -26,15 +27,9 @@ class LoginController extends Controller
     /**
      * Menangani upaya login admin.
      */
-    public function store(Request $request)
+    public function store(AdminLoginRequest $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
-        ]);
-
-        // Gunakan guard 'admin' untuk attempt
-        if (Auth::guard('admin')->attempt($request->only('email', 'password'), $request->filled('remember'))) {
+        if (Auth::guard('admin')->attempt($request->validated(), $request->filled('remember'))) {
             $request->session()->regenerate();
 
             // Redirect ke dashboard admin setelah login berhasil

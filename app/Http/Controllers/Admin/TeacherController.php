@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Teacher;
 use App\Models\SiteSetting;
 use App\Services\ImageService;
+use App\Http\Requests\TeacherSettingsRequest;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
@@ -33,13 +34,9 @@ class TeacherController extends Controller
         ]);
     }
 
-    public function updateSettings(Request $request)
+    public function updateSettings(TeacherSettingsRequest $request)
     {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'subtitle' => 'required|string',
-            'image_file' => 'nullable|image|max:10240',
-        ]);
+        $validated = $request->validated();
 
         try {
             DB::beginTransaction();

@@ -6,11 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\AiSetting;
 use App\Services\GroqService;
 use App\Services\EmbeddingService;
+use App\Http\Requests\AiSettingUpdateRequest;
+use App\Http\Requests\AiSettingRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
-use App\Http\Requests\AiSettingRequest;
 use Illuminate\Support\Facades\DB;
 
 class AiSettingController extends Controller
