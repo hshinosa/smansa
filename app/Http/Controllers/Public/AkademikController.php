@@ -190,7 +190,7 @@ class AkademikController extends Controller
      */
     public function program()
     {
-        // Ambil semua program KECUALI Program Studi
+        // Get all programs EXCEPT Program Studi
         $programsQuery = Program::where('category', '!=', 'Program Studi')
             ->orderBy('sort_order')
             ->with('media')
