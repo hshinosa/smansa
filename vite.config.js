@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
                 exclude: [/\.(br)$/, /\.(gz)$/],
             }),
         ],
-        base: cdnUrl || undefined,
+        base: cdnUrl ? cdnUrl + '/build/' : '/build/',
         resolve: {
             alias: {
                 '@': '/resources/js',
@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
         },
         build: {
             // CDN base URL for production
-            base: cdnUrl || '/',
+            base: cdnUrl ? cdnUrl + '/build/' : '/build/',
             // Optimize build
             rollupOptions: {
                 output: {

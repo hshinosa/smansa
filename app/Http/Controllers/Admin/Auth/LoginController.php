@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\AdminLoginRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -29,11 +30,13 @@ class LoginController extends Controller
      */
     public function store(AdminLoginRequest $request)
     {
-        if (Auth::guard('admin')->attempt($request->validated(), $request->filled('remember'))) {
+        $credentials = $request->validated();
+
+        if (Auth::guard('admin')->attempt($credentials, $request->filled('remember'))) {
             $request->session()->regenerate();
             
             // Redirect to dashboard after successful login
-            return redirect()->intended(route('admin.dashboard')); // Create this route later
+            return redirect()->intended(route('admin.dashboard'));
         }
 
         // If login fails
