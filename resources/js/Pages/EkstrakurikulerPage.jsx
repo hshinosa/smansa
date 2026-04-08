@@ -147,10 +147,9 @@ const ActivityCard = ({ activity, categoryTheme, onClick, isOrganisasi = false }
                     </div>
                 )}
 
-                {/* Action Button */}
                 <button
                     onClick={onClick}
-                    className="w-full py-2.5 rounded-xl border-2 border-primary text-primary font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 hover:bg-primary hover:text-white"
+                    className="w-full py-3 sm:py-2.5 min-h-[44px] rounded-xl border-2 border-primary text-primary font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 hover:bg-primary hover:text-white"
                 >
                     Lihat Detail <ArrowRight className="w-4 h-4" />
                 </button>
@@ -210,8 +209,7 @@ const ActivityDetailModal = ({ show, onClose, activity, categoryTheme, isOrganis
                     </button>
                 </div>
 
-                {/* Modal Content - Scrollable */}
-                <div className="overflow-y-auto p-8 pt-12">
+                <div className="overflow-y-auto p-4 sm:p-6 md:p-8 pt-12">
                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Left Column: Main Info */}
                         <div className="lg:col-span-2 space-y-8">
@@ -499,8 +497,7 @@ export default function EkstrakurikulerPage({ extracurriculars = [] }) {
                                         </h2>
                                     </div>
 
-                                    {/* Grid */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
                                         {group.activities.map((activity, index) => (
                                             <ActivityCard
                                                 key={index}
@@ -535,8 +532,7 @@ export default function EkstrakurikulerPage({ extracurriculars = [] }) {
                                         </h2>
                                     </div>
 
-                                    {/* Grid */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
                                         {group.activities.map((activity, index) => (
                                             <ActivityCard
                                                 key={index}
