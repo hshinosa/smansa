@@ -361,39 +361,10 @@ export default function Index({ teachers, currentSettings }) {
                                                  {data.position === 'Wakasek' ? 'Bidang Wakasek' :
                                                   data.position === 'Guru' ? 'Mata Pelajaran' : 'Unit Kerja'}
                                              </p>
-                                         </div>
-                                     </div>
-                                 </div>
-                             </div>
-
-                                         <div>
-                                             <InputLabel htmlFor="phone" value="No. Telepon (Opsional)" />
-                                             <TextInput
-                                                 id="phone"
-                                                 type="text"
-                                                 className="mt-1 block w-full"
-                                                 value={data.phone}
-                                                 onChange={(e) => setData('phone', e.target.value)}
-                                                 placeholder="08xxxxxxxxxx"
-                                             />
-                                         </div>
-
-                                         <div>
-                                             <InputLabel htmlFor="is_active" value="Status" />
-                                             <select
-                                                 id="is_active"
-                                                 className="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:border-accent-yellow focus:ring-accent-yellow text-sm"
-                                                 value={data.is_active}
-                                                 onChange={(e) => setData('is_active', e.target.value === 'true')}
-                                             >
-                                                 <option value="true">Aktif</option>
-                                                 <option value="false">Nonaktif</option>
-                                             </select>
-                                         </div>
-                                     </div>
-                                 </div>
-                            </div>
-                        </div>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
 
                         {/* Action buttons - Fixed at bottom */}
                         <div className="flex flex-col sm:flex-row justify-end gap-3 p-5 sm:p-6 border-t border-gray-200 bg-gray-50">
