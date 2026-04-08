@@ -104,7 +104,7 @@ const ActivityCard = ({ activity, categoryTheme, onClick, isOrganisasi = false }
     return (
         <div className="group bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-full transform hover:-translate-y-1">
             {/* Header Visual */}
-            <div className="h-48 relative overflow-hidden bg-gray-900">
+            <div className="h-56 sm:h-64 md:h-72 relative overflow-hidden bg-gray-900">
                 {cardImage ? (
                     <>
                         <ResponsiveImage
@@ -113,7 +113,7 @@ const ActivityCard = ({ activity, categoryTheme, onClick, isOrganisasi = false }
                             className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                             loading="lazy"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/20 to-transparent"></div>
                     </>
                 ) : (
                     <>
@@ -166,8 +166,6 @@ const ActivityDetailModal = ({ show, onClose, activity, categoryTheme, isOrganis
     // Use specific detailed fields if available, otherwise fallback
     // Process URLs using getImageUrl helper
     const headerImage = getImageUrl(activity.bg_image_url || activity.image_url);
-    // User requested to use main image (image_url) for the profile box, not the background image
-    const mainImage = getImageUrl(activity.image_url);
     const description = activity.activity_description || activity.description;
     
     // Check if achievements_data exists and is an array (new format), otherwise use achievements (old format)
@@ -180,37 +178,25 @@ const ActivityDetailModal = ({ show, onClose, activity, categoryTheme, isOrganis
     return (
         <Modal show={show} onClose={onClose} maxWidth="4xl">
              <div className="bg-white rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                {/* Modal Header Banner - Fixed height */}
-                <div className="h-48 relative overflow-hidden bg-gray-900 shrink-0 rounded-t-2xl">
+                <div className="h-56 sm:h-64 md:h-72 relative overflow-hidden bg-gray-900 shrink-0 rounded-t-2xl">
                     {/* Background Image */}
                     <ResponsiveImage
                         src={headerImage}
                         alt={activity.name}
-                        className="absolute inset-0 w-full h-full object-cover opacity-80"
+                        className="absolute inset-0 w-full h-full object-cover opacity-90"
                         loading="lazy"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent"></div>
                     
-                    <div className="absolute bottom-0 left-0 p-8 w-full">
-                        <div className="flex items-end gap-6">
-                            {/* Profile Image / Logo */}
-                            <div className="w-20 h-20 bg-white rounded-2xl shadow-xl flex items-center justify-center transform translate-y-6 overflow-hidden border-2 border-white">
-                                {mainImage ? (
-                                    <img src={mainImage} alt={activity.name} className="w-full h-full object-cover" />
-                                ) : (
-                                    <Icon className={`w-10 h-10 ${categoryTheme.color}`} />
-                                )}
+                    <div className="absolute bottom-0 left-0 p-6 w-full">
+                        <div className="text-white flex-1">
+                            <div className="text-white/80 text-sm font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
+                                <span className={`${categoryTheme.bg} ${categoryTheme.color} px-2 py-0.5 rounded text-xs`}>
+                                    {isOrganisasi ? 'Organisasi' : 'Ekstrakurikuler'}
+                                </span>
+                                <span>{activity.category}</span>
                             </div>
-                            
-                            <div className="text-white flex-1 transform translate-y-3">
-                                <div className="text-white/80 text-sm font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
-                                    <span className={`${categoryTheme.bg} ${categoryTheme.color} px-2 py-0.5 rounded text-xs`}>
-                                        {isOrganisasi ? 'Organisasi' : 'Ekstrakurikuler'}
-                                    </span>
-                                    <span>{activity.category}</span>
-                                </div>
-                                <h2 className="text-xl md:text-2xl font-serif font-bold drop-shadow-md">{activity.name}</h2>
-                            </div>
+                            <h2 className="text-xl md:text-2xl font-serif font-bold drop-shadow-md">{activity.name}</h2>
                         </div>
                     </div>
                     
@@ -474,8 +460,7 @@ export default function EkstrakurikulerPage({ extracurriculars = [] }) {
             />
 
             <main id="main-content" className="pt-20" tabIndex="-1">
-            {/* 1. HERO SECTION (Consistent with KurikulumPage) */}
-            <section className="relative h-[40vh] min-h-[400px] flex items-center justify-center overflow-hidden">
+            <section className="relative h-[50vh] sm:h-[60vh] min-h-[400px] flex items-center justify-center overflow-hidden">
                 {/* Background Image */}
                 <div className="absolute inset-0 z-0">
                     {formatImagePath(heroImage) && (
@@ -484,7 +469,7 @@ export default function EkstrakurikulerPage({ extracurriculars = [] }) {
                             alt={`Background Organisasi & Ekstrakurikuler ${siteName}`} 
                         />
                     )}
-                    <div className="absolute inset-0 bg-black/60"></div>
+                    <div className="absolute inset-0 bg-black/30"></div>
                 </div>
 
                 <div className="relative z-10 container mx-auto px-4 text-center text-white">
