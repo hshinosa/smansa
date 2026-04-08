@@ -88,7 +88,6 @@ export default function Index({ teachers, currentSettings }) {
             setCurrentId(null);
             reset();
             setData('type', type);
-            // Set default position based on type
             setData('position', type === 'guru' ? 'Guru' : 'Staff');
         }
         setIsModalOpen(true);
@@ -281,71 +280,118 @@ export default function Index({ teachers, currentSettings }) {
                                                     onChange={(e) => setData('email', e.target.value)}
                                                     placeholder="Email..."
                                                 />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
 
-                                {/* Column 3: Employment Data (4 cols) */}
-                                <div className="md:col-span-4 space-y-5">
-                                    <h4 className="text-sm font-bold text-gray-900 border-b pb-2 flex items-center gap-2">
-                                        <Users size={16} /> Data Kepegawaian
-                                    </h4>
-                                    
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <InputLabel htmlFor="type" value="Tipe" />
-                                                <select
-                                                    id="type"
-                                                    className="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:border-accent-yellow focus:ring-accent-yellow text-sm"
-                                                    value={data.type}
-                                                    onChange={(e) => setData('type', e.target.value)}
-                                                >
-                                                    <option value="guru">Guru</option>
-                                                    <option value="staff">Staff</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <InputLabel htmlFor="position" value="Jabatan" />
-                                                <select
-                                                    id="position"
-                                                    className="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:border-accent-yellow focus:ring-accent-yellow text-sm"
-                                                    value={data.position}
-                                                    onChange={(e) => setData('position', e.target.value)}
-                                                    required
-                                                >
-                                                    <option value="">Pilih...</option>
-                                                    <option value="Kepala Sekolah">Kepala Sekolah</option>
-                                                    <option value="Wakasek">Wakasek</option>
-                                                    <option value="Guru">Guru</option>
-                                                    <option value="Staff">Staff</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        
-                                        <InputError message={errors.position} />
+                             {/* Bio Section - Full Width */}
+                             <div className="mt-6">
+                                 <h4 className="text-sm font-bold text-gray-900 border-b pb-2 mb-4 flex items-center gap-2">
+                                     <User size={16} /> Biografi Singkat
+                                 </h4>
+                                 <div>
+                                     <InputLabel htmlFor="bio" value="Biografi" />
+                                     <textarea
+                                         id="bio"
+                                         rows="4"
+                                         className="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:border-accent-yellow focus:ring-accent-yellow text-sm"
+                                         value={data.bio}
+                                         onChange={(e) => setData('bio', e.target.value)}
+                                         placeholder="Tuliskan biografi singkat guru..."
+                                     />
+                                     <p className="text-xs text-gray-500 mt-1">Maksimal 500 karakter</p>
+                                     <InputError message={errors.bio} className="mt-2" />
+                                 </div>
 
-                                        <div>
-                                            <InputLabel htmlFor="department" value="Unit / Bidang" />
-                                            <TextInput
-                                                id="department"
-                                                type="text"
-                                                className="mt-1 block w-full"
-                                                value={data.department}
-                                                onChange={(e) => setData('department', e.target.value)}
-                                                placeholder={
-                                                    data.position === 'Guru' ? 'Matematika' :
-                                                    data.position === 'Staff' ? 'Tata Usaha' : 'Bidang/Unit'
-                                                }
-                                            />
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                {data.position === 'Wakasek' ? 'Bidang Wakasek' :
-                                                 data.position === 'Guru' ? 'Mata Pelajaran' : 'Unit Kerja'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
+                                 {/* Column 3: Employment Data (4 cols) */}
+                                 <div className="md:col-span-4 space-y-5">
+                                     <h4 className="text-sm font-bold text-gray-900 border-b pb-2 flex items-center gap-2">
+                                         <Users size={16} /> Data Kepegawaian
+                                     </h4>
+                                     
+                                     <div className="space-y-4">
+                                         <div className="grid grid-cols-2 gap-4">
+                                             <div>
+                                                 <InputLabel htmlFor="type" value="Tipe" />
+                                                 <select
+                                                     id="type"
+                                                     className="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:border-accent-yellow focus:ring-accent-yellow text-sm"
+                                                     value={data.type}
+                                                     onChange={(e) => setData('type', e.target.value)}
+                                                 >
+                                                     <option value="guru">Guru</option>
+                                                     <option value="staff">Staff</option>
+                                                 </select>
+                                             </div>
+                                             <div>
+                                                 <InputLabel htmlFor="position" value="Jabatan" />
+                                                 <select
+                                                     id="position"
+                                                     className="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:border-accent-yellow focus:ring-accent-yellow text-sm"
+                                                     value={data.position}
+                                                     onChange={(e) => setData('position', e.target.value)}
+                                                     required
+                                                 >
+                                                     <option value="">Pilih...</option>
+                                                     <option value="Kepala Sekolah">Kepala Sekolah</option>
+                                                     <option value="Wakasek">Wakasek</option>
+                                                     <option value="Guru">Guru</option>
+                                                     <option value="Staff">Staff</option>
+                                                 </select>
+                                             </div>
+                                         </div>
+                                         
+                                         <InputError message={errors.position} />
+
+                                         <div>
+                                             <InputLabel htmlFor="department" value="Unit / Bidang" />
+                                             <TextInput
+                                                 id="department"
+                                                 type="text"
+                                                 className="mt-1 block w-full"
+                                                 value={data.department}
+                                                 onChange={(e) => setData('department', e.target.value)}
+                                                 placeholder={
+                                                     data.position === 'Guru' ? 'Matematika' :
+                                                     data.position === 'Staff' ? 'Tata Usaha' : 'Bidang/Unit'
+                                                 }
+                                             />
+                                             <p className="text-xs text-gray-500 mt-1">
+                                                 {data.position === 'Wakasek' ? 'Bidang Wakasek' :
+                                                  data.position === 'Guru' ? 'Mata Pelajaran' : 'Unit Kerja'}
+                                             </p>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+
+                                         <div>
+                                             <InputLabel htmlFor="phone" value="No. Telepon (Opsional)" />
+                                             <TextInput
+                                                 id="phone"
+                                                 type="text"
+                                                 className="mt-1 block w-full"
+                                                 value={data.phone}
+                                                 onChange={(e) => setData('phone', e.target.value)}
+                                                 placeholder="08xxxxxxxxxx"
+                                             />
+                                         </div>
+
+                                         <div>
+                                             <InputLabel htmlFor="is_active" value="Status" />
+                                             <select
+                                                 id="is_active"
+                                                 className="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:border-accent-yellow focus:ring-accent-yellow text-sm"
+                                                 value={data.is_active}
+                                                 onChange={(e) => setData('is_active', e.target.value === 'true')}
+                                             >
+                                                 <option value="true">Aktif</option>
+                                                 <option value="false">Nonaktif</option>
+                                             </select>
+                                         </div>
+                                     </div>
+                                 </div>
                             </div>
                         </div>
 
