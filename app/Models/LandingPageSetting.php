@@ -24,35 +24,35 @@ class LandingPageSetting extends Model implements HasMedia
     /**
      * Register media conversions
      */
-    public function registerMediaConversions(Media $media = null): void
+    public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('mobile')
             ->width(375)
             ->format('webp')
-            ->quality(80)
+            ->quality(75)
             ->nonQueued();
 
         $this->addMediaConversion('tablet')
             ->width(768)
             ->format('webp')
-            ->quality(85)
+            ->quality(75)
             ->nonQueued();
 
         $this->addMediaConversion('desktop')
             ->width(1280)
             ->format('webp')
-            ->quality(90)
+            ->quality(70)
             ->nonQueued();
 
         $this->addMediaConversion('large')
             ->width(1920)
             ->format('webp')
-            ->quality(90)
+            ->quality(65)
             ->nonQueued();
 
         $this->addMediaConversion('webp')
             ->format('webp')
-            ->quality(95)
+            ->quality(70)
             ->nonQueued();
     }
 
@@ -61,12 +61,12 @@ class LandingPageSetting extends Model implements HasMedia
     {
         return [
             'hero' => [
-                'title_line1', 
-                'title_line2', 
-                'hero_text', 
+                'title_line1',
+                'title_line2',
+                'hero_text',
                 'background_image_url',
                 'student_image_url',
-                'stats'
+                'stats',
             ],
             'about_lp' => ['title', 'description_html', 'image_url'],
             'kepsek_welcome_lp' => ['title', 'kepsek_name', 'kepsek_title', 'kepsek_image_url', 'welcome_text_html'],
@@ -91,7 +91,7 @@ class LandingPageSetting extends Model implements HasMedia
                     ['label' => 'Akreditasi', 'value' => 'A (Unggul)', 'icon_name' => 'Trophy'],
                     ['label' => 'Lulusan ke PTN', 'value' => '90% Diterima', 'icon_name' => 'GraduationCap'],
                     ['label' => 'Siswa Aktif', 'value' => '1200+ Siswa', 'icon_name' => 'Users'],
-                ]
+                ],
             ],
             'about_lp' => [
                 'title' => 'Tentang SMAN 1 Baleendah',
@@ -114,23 +114,23 @@ class LandingPageSetting extends Model implements HasMedia
                         'fullName' => 'Matematika & Ilmu Pengetahuan Alam',
                         'icon_name' => 'Microscope',
                         'description' => 'Program unggulan bagi siswa yang berminat dalam sains, teknologi, dan matematika. Fasilitas laboratorium lengkap.',
-                        'link' => '/akademik/program-studi/mipa'
+                        'link' => '/akademik/program-studi/mipa',
                     ],
                     [
                         'title' => 'IPS',
                         'fullName' => 'Ilmu Pengetahuan Sosial',
                         'icon_name' => 'Globe',
                         'description' => 'Mendalami fenomena sosial, ekonomi, dan sejarah. Membentuk karakter kritis dan berwawasan luas.',
-                        'link' => '/akademik/program-studi/ips'
+                        'link' => '/akademik/program-studi/ips',
                     ],
                     [
                         'title' => 'Bahasa',
                         'fullName' => 'Ilmu Bahasa',
                         'icon_name' => 'BookOpen',
                         'description' => 'Eksplorasi bahasa asing dan seni budaya. Mempersiapkan siswa kompeten dalam komunikasi global.',
-                        'link' => '/akademik/program-studi/bahasa'
-                    ]
-                ]
+                        'link' => '/akademik/program-studi/bahasa',
+                    ],
+                ],
             ],
             'gallery_lp' => [
                 'title' => 'Galeri Sekolah',
@@ -139,8 +139,8 @@ class LandingPageSetting extends Model implements HasMedia
                     '/images/panen-karya-sman1-baleendah.jpg',
                     '/images/hero-bg-sman1baleendah.jpeg',
                     '/images/keluarga-besar-sman1-baleendah.png',
-                    '/images/hero-bg-sman1baleendah.jpeg'
-                ]
+                    '/images/hero-bg-sman1baleendah.jpeg',
+                ],
             ],
             'cta_lp' => [
                 'title' => 'Siap Menjadi Bagian dari Keluarga Besar SMAN 1 Baleendah?',

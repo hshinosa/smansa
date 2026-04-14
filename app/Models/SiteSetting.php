@@ -28,30 +28,30 @@ class SiteSetting extends Model implements HasMedia
         $this->addMediaConversion('mobile')
             ->width(375)
             ->format('webp')
-            ->quality(80)
+            ->quality(75)
             ->nonQueued();
 
         $this->addMediaConversion('tablet')
             ->width(768)
             ->format('webp')
-            ->quality(85)
+            ->quality(75)
             ->nonQueued();
 
         $this->addMediaConversion('desktop')
             ->width(1280)
             ->format('webp')
-            ->quality(90)
+            ->quality(70)
             ->nonQueued();
 
         $this->addMediaConversion('large')
             ->width(1920)
             ->format('webp')
-            ->quality(90)
+            ->quality(70)
             ->nonQueued();
 
         $this->addMediaConversion('webp')
             ->format('webp')
-            ->quality(95)
+            ->quality(70)
             ->nonQueued();
     }
 

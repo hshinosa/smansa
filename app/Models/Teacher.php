@@ -53,7 +53,7 @@ class Teacher extends Model implements HasMedia
             ->height(400)
             ->fit(\Spatie\Image\Enums\Fit::Crop, 300, 400)
             ->format('webp')
-            ->quality(80)
+            ->quality(75)
             ->performOnCollections('photos')
             ->nonQueued();
 
@@ -64,7 +64,7 @@ class Teacher extends Model implements HasMedia
             ->height(600)
             ->fit(\Spatie\Image\Enums\Fit::Crop, 450, 600)
             ->format('webp')
-            ->quality(85)
+            ->quality(75)
             ->performOnCollections('photos')
             ->nonQueued();
 
@@ -75,7 +75,7 @@ class Teacher extends Model implements HasMedia
             ->height(800)
             ->fit(\Spatie\Image\Enums\Fit::Crop, 600, 800)
             ->format('webp')
-            ->quality(90)
+            ->quality(70)
             ->performOnCollections('photos')
             ->nonQueued();
 
@@ -86,7 +86,7 @@ class Teacher extends Model implements HasMedia
             ->height(1200)
             ->fit(\Spatie\Image\Enums\Fit::Crop, 900, 1200)
             ->format('webp')
-            ->quality(90)
+            ->quality(70)
             ->performOnCollections('photos')
             ->nonQueued();
 
@@ -97,7 +97,7 @@ class Teacher extends Model implements HasMedia
             ->height(800)
             ->fit(\Spatie\Image\Enums\Fit::Crop, 600, 800)
             ->format('webp')
-            ->quality(95)
+            ->quality(70)
             ->performOnCollections('photos')
             ->nonQueued();
 
@@ -108,7 +108,7 @@ class Teacher extends Model implements HasMedia
             ->height(267)
             ->fit(\Spatie\Image\Enums\Fit::Crop, 200, 267)
             ->format('webp')
-            ->quality(85)
+            ->quality(75)
             ->nonQueued();
     }
 

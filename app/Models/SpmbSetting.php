@@ -26,13 +26,13 @@ class SpmbSetting extends Model implements HasMedia
         $this->addMediaConversion('desktop')
             ->width(1280)
             ->format('webp')
-            ->quality(90)
+            ->quality(70)
             ->nonQueued();
 
         $this->addMediaConversion('mobile')
             ->width(375)
             ->format('webp')
-            ->quality(80)
+            ->quality(75)
             ->nonQueued();
     }
 

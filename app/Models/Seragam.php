@@ -51,7 +51,7 @@ class Seragam extends Model implements HasMedia
             ->width(400)
             ->height(300)
             ->format('webp')
-            ->quality(80)
+            ->quality(75)
             ->performOnCollections('images')
             ->nonQueued();
 
@@ -71,7 +71,7 @@ class Seragam extends Model implements HasMedia
             ->width(1024)
             ->height(768)
             ->format('webp')
-            ->quality(80)
+            ->quality(75)
             ->performOnCollections('images')
             ->nonQueued();
 
@@ -81,7 +81,7 @@ class Seragam extends Model implements HasMedia
             ->width(1920)
             ->height(1080)
             ->format('webp')
-            ->quality(85)
+            ->quality(75)
             ->performOnCollections('images')
             ->nonQueued();
     }

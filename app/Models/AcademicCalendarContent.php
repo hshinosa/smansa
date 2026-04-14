@@ -34,12 +34,12 @@ class AcademicCalendarContent extends Model implements HasMedia
         $this->addMediaConversion('large')
             ->width(1920)
             ->format('webp')
-            ->quality(90)
+            ->quality(70)
             ->nonQueued();
 
         $this->addMediaConversion('webp')
             ->format('webp')
-            ->quality(95)
+            ->quality(70)
             ->nonQueued();
     }
 

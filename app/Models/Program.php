@@ -29,18 +29,18 @@ class Program extends Model implements HasMedia
         $this->addMediaConversion('thumb')
             ->width(400)
             ->format('webp')
-            ->quality(80)
+            ->quality(75)
             ->nonQueued();
 
         $this->addMediaConversion('medium')
             ->width(800)
             ->format('webp')
-            ->quality(85)
+            ->quality(75)
             ->nonQueued();
 
         $this->addMediaConversion('webp')
             ->format('webp')
-            ->quality(90)
+            ->quality(70)
             ->nonQueued();
     }
 }
