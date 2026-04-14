@@ -33,14 +33,14 @@ class Gallery extends Model implements HasMedia
     /**
      * Register media conversions for gallery images
      */
-    public function registerMediaConversions(Media $media = null): void
+    public function registerMediaConversions(?Media $media = null): void
     {
-        // Mobile size (375px)
+        // Mobile size (375px) - smallest, lowest quality acceptable
         $this
             ->addMediaConversion('mobile')
             ->width(375)
             ->format('webp')
-            ->quality(80)
+            ->quality(75)
             ->performOnCollections('images')
             ->nonQueued();
 
@@ -49,43 +49,43 @@ class Gallery extends Model implements HasMedia
             ->addMediaConversion('tablet')
             ->width(768)
             ->format('webp')
-            ->quality(85)
+            ->quality(75)
             ->performOnCollections('images')
             ->nonQueued();
 
-        // Desktop size (1280px)
+        // Desktop size (1280px) - lower quality to prevent larger files
         $this
             ->addMediaConversion('desktop')
             ->width(1280)
             ->format('webp')
-            ->quality(90)
+            ->quality(70)
             ->performOnCollections('images')
             ->nonQueued();
 
-        // Large/Full HD (1920px)
+        // Large/Full HD (1920px) - lowest quality for large sizes
         $this
             ->addMediaConversion('large')
             ->width(1920)
             ->format('webp')
-            ->quality(90)
+            ->quality(65)
             ->performOnCollections('images')
             ->nonQueued();
 
-        // WebP original
+        // WebP original - moderate quality
         $this
             ->addMediaConversion('webp')
             ->format('webp')
-            ->quality(95)
+            ->quality(70)
             ->performOnCollections('images')
             ->nonQueued();
 
-        // Thumbnail for grid view
+        // Thumbnail for grid view - small size, lower quality
         $this
             ->addMediaConversion('thumb')
             ->width(400)
             ->height(300)
             ->format('webp')
-            ->quality(80)
+            ->quality(65)
             ->nonQueued();
     }
 
@@ -103,4 +103,3 @@ class Gallery extends Model implements HasMedia
             ->acceptsMimeTypes(['video/mp4', 'video/webm', 'video/quicktime']);
     }
 }
-

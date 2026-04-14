@@ -39,59 +39,53 @@ class Post extends Model implements HasMedia
     /**
      * Register media conversions for responsive images and WebP
      */
-    public function registerMediaConversions(Media $media = null): void
+    public function registerMediaConversions(?Media $media = null): void
     {
-        // Mobile size (375px) - WebP
         $this
             ->addMediaConversion('mobile')
             ->width(375)
             ->format('webp')
-            ->quality(80)
+            ->quality(75)
             ->performOnCollections('featured')
             ->nonQueued();
 
-        // Tablet size (768px) - WebP
         $this
             ->addMediaConversion('tablet')
             ->width(768)
             ->format('webp')
-            ->quality(80)
+            ->quality(75)
             ->performOnCollections('featured')
             ->nonQueued();
 
-        // Desktop size (1280px) - WebP
         $this
             ->addMediaConversion('desktop')
             ->width(1280)
             ->format('webp')
-            ->quality(85)
+            ->quality(70)
             ->performOnCollections('featured')
             ->nonQueued();
 
-        // Large/HD size (1920px) - WebP
         $this
             ->addMediaConversion('large')
             ->width(1920)
             ->format('webp')
-            ->quality(85)
+            ->quality(65)
             ->performOnCollections('featured')
             ->nonQueued();
 
-        // Original as WebP (for modern browsers)
         $this
             ->addMediaConversion('webp')
             ->format('webp')
-            ->quality(90)
+            ->quality(70)
             ->performOnCollections('featured')
             ->nonQueued();
 
-        // Thumbnail for admin (200px)
         $this
             ->addMediaConversion('thumb')
             ->width(200)
             ->height(200)
             ->format('webp')
-            ->quality(75)
+            ->quality(65)
             ->nonQueued();
     }
 
@@ -139,7 +133,7 @@ class Post extends Model implements HasMedia
             to_tsvector('indonesian', COALESCE(title, '') || ' ' || COALESCE(excerpt, '') || ' ' || COALESCE(content, ''))
             @@ plainto_tsquery('indonesian', ?)
         ", [$searchTerm])
-        ->orderByRaw("
+            ->orderByRaw("
             ts_rank(to_tsvector('indonesian', COALESCE(title, '') || ' ' || COALESCE(excerpt, '') || ' ' || COALESCE(content, '')),
             plainto_tsquery('indonesian', ?)) DESC
         ", [$searchTerm]);
@@ -154,12 +148,12 @@ class Post extends Model implements HasMedia
             return $query;
         }
 
-        $search = '%' . strtolower($searchTerm) . '%';
+        $search = '%'.strtolower($searchTerm).'%';
 
         return $query->where(function ($q) use ($search) {
             $q->whereRaw('LOWER(title) LIKE ?', [$search])
-              ->orWhereRaw('LOWER(excerpt) LIKE ?', [$search])
-              ->orWhereRaw('LOWER(content) LIKE ?', [$search]);
+                ->orWhereRaw('LOWER(excerpt) LIKE ?', [$search])
+                ->orWhereRaw('LOWER(content) LIKE ?', [$search]);
         });
     }
 
@@ -180,4 +174,3 @@ class Post extends Model implements HasMedia
         }
     }
 }
-

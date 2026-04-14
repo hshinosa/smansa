@@ -6,6 +6,7 @@ import { normalizeUrl } from '@/Utils/imageUtils';
  * 
  * Automatically renders responsive images with WebP support and fallbacks
  * Supports both static images (public folder) and Spatie Media Library images
+ * Features skeleton placeholder and fade-in transition for better UX
  */
 export default function ResponsiveImage({
     src,
@@ -18,11 +19,17 @@ export default function ResponsiveImage({
     height,
     sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 1280px',
     fallback = null,
+    eager = false,
+    skeleton = false,
     ...props
 }) {
     const [imageError, setImageError] = useState(false);
+    const [isLoaded, setIsLoaded] = useState(eager);
     
-    // Handle image load error
+    const handleLoad = () => {
+        setIsLoaded(true);
+    };
+    
     const handleError = () => {
         setImageError(true);
     };
@@ -53,53 +60,63 @@ export default function ResponsiveImage({
         return `/storage/${id}/conversions/${baseFilename}-${conversionName}.webp`;
     };
 
-    // If image failed to load and fallback is provided, render fallback
-    if (imageError && fallback) {
-        return fallback;
+    // If image failed to load, render fallback when provided.
+    // Otherwise return nothing so the parent placeholder can remain visible.
+    if (imageError) {
+        return fallback || null;
     }
     
     // If Spatie media object is provided, use media library conversions
     if (media) {
         const originalUrl = normalizeUrl(media.original_url);
         return (
-            <picture>
-                {media.conversions?.mobile && (
-                    <source
-                        media="(max-width: 640px)"
-                        srcSet={normalizeUrl(media.conversions.mobile)}
-                        type="image/webp"
+            <div className={skeleton && !isLoaded ? 'relative' : ''}>
+                {skeleton && !isLoaded && !imageError && (
+                    <div 
+                        className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded"
+                        style={{ minHeight: height || 200 }}
                     />
                 )}
-                {media.conversions?.tablet && (
+                <picture className={skeleton && !isLoaded ? 'opacity-0' : ''}>
+                    {media.conversions?.mobile && (
+                        <source
+                            media="(max-width: 640px)"
+                            srcSet={normalizeUrl(media.conversions.mobile)}
+                            type="image/webp"
+                        />
+                    )}
+                    {media.conversions?.tablet && (
+                        <source
+                            media="(max-width: 1024px)"
+                            srcSet={normalizeUrl(media.conversions.tablet)}
+                            type="image/webp"
+                        />
+                    )}
+                    {media.conversions?.desktop && (
+                        <source
+                            media="(min-width: 1025px)"
+                            srcSet={normalizeUrl(media.conversions.desktop)}
+                            type="image/webp"
+                        />
+                    )}
                     <source
-                        media="(max-width: 1024px)"
-                        srcSet={normalizeUrl(media.conversions.tablet)}
+                        srcSet={normalizeUrl(media.conversions?.webp) || originalUrl}
                         type="image/webp"
                     />
-                )}
-                {media.conversions?.desktop && (
-                    <source
-                        media="(min-width: 1025px)"
-                        srcSet={normalizeUrl(media.conversions.desktop)}
-                        type="image/webp"
+                    <img
+                        src={originalUrl}
+                        alt={alt}
+                        className={`${className} transition-opacity duration-300`}
+                        loading={eager ? 'eager' : loading}
+                        fetchpriority={fetchpriority}
+                        width={width}
+                        height={height}
+                        onLoad={handleLoad}
+                        onError={handleError}
+                        {...props}
                     />
-                )}
-                <source
-                    srcSet={normalizeUrl(media.conversions?.webp) || originalUrl}
-                    type="image/webp"
-                />
-                <img
-                    src={originalUrl}
-                    alt={alt}
-                    className={className}
-                    loading={loading}
-                    fetchpriority={fetchpriority}
-                    width={width}
-                    height={height}
-                    onError={handleError}
-                    {...props}
-                />
-            </picture>
+                </picture>
+            </div>
         );
     }
 
@@ -111,23 +128,27 @@ export default function ResponsiveImage({
         return fallback || null;
     }
 
-    // For Spatie Media Library URLs - use original for now
-    // Conversions will be created automatically on next upload
-    // This provides faster page loads without regenerating all media
-
-    // For static images or external URLs - just render img tag
     return (
-        <img
-            src={normalizedSrc}
-            alt={alt}
-            className={className}
-            loading={loading}
-            fetchpriority={fetchpriority}
-            width={width}
-            height={height}
-            onError={handleError}
-            {...props}
-        />
+        <div className={skeleton && !isLoaded ? 'relative' : ''}>
+            {skeleton && !isLoaded && !imageError && (
+                <div 
+                    className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded"
+                    style={{ minHeight: height || 200 }}
+                />
+            )}
+            <img
+                src={normalizedSrc}
+                alt={alt}
+                className={`${className} transition-opacity duration-300`}
+                loading={eager ? 'eager' : loading}
+                fetchpriority={fetchpriority}
+                width={width}
+                height={height}
+                onLoad={handleLoad}
+                onError={handleError}
+                {...props}
+            />
+        </div>
     );
 }
 

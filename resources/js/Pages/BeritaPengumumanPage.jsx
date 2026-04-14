@@ -154,6 +154,8 @@ export default function BeritaPengumumanPage({ posts = [], popularPosts = [] }) 
             <main id="main-content" className="pt-20" tabIndex="-1">
             {/* HERO SECTION (Consistent with AcademicCalendarPage) */}
             <section className="relative h-[40vh] min-h-[400px] flex items-center justify-center overflow-hidden">
+                <link rel="preload" as="image" href={formatImagePath(heroImage)} fetchpriority="high" />
+                
                 {/* Background Image */}
                 <div className="absolute inset-0 z-0">
                     <img 

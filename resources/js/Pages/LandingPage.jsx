@@ -72,6 +72,8 @@ export default function LandingPage({
 
             {/* HERO SECTION */}
             <section className="relative pt-32 md:pt-40 overflow-hidden">
+                <link rel="preload" as="image" href={heroContent?.background_image_url || '/images/hero-bg-sman1baleendah.jpeg'} fetchpriority="high" />
+                
                 {/* Hero Background Image */}
                 <div className="absolute inset-0 z-0">
                     {(heroContent?.background_image_url || heroContent?.backgroundImage) && (
@@ -80,6 +82,8 @@ export default function LandingPage({
                             media={heroContent?.backgroundImage}
                             alt="Background"
                             className="w-full h-full object-cover"
+                            loading="eager"
+                            fetchpriority="high"
                         />
                     )}
                 </div>
