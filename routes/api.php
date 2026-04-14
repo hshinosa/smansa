@@ -20,8 +20,9 @@ Route::name('api.')->group(function () {
     Route::post('/chat/send', [\App\Http\Controllers\Api\ChatController::class, 'sendMessage'])
         ->middleware('throttle:ai_chat')
         ->name('chat.send');
-    
+
     Route::get('/chat/history', [\App\Http\Controllers\Api\ChatController::class, 'getHistory'])
+        ->middleware('throttle:100,1')
         ->name('chat.history');
 
     // Security: CSP Reporting

@@ -2,7 +2,6 @@ import React from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { MapPin, Phone, Mail, Link2, Facebook, Instagram, Twitter, Youtube } from 'lucide-react';
 import { getNavigationData } from '@/Utils/navigationData';
-import ChatWidget from './ChatWidget';
 
 export default function Footer({
     logoSman1,
@@ -141,7 +140,6 @@ export default function Footer({
                     <p>{footerSettings.copyright_text || `© ${new Date().getFullYear()} ${siteName}. All Rights Reserved.`}</p>
                 </div>
             </div>
-            <ChatWidget />
         </footer>
     );
 }

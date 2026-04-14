@@ -2,24 +2,23 @@
 
 namespace App\Services;
 
-use App\Models\RagDocument;
-use App\Models\RagDocumentChunk;
+use App\Models\AcademicCalendarContent;
 use App\Models\AiSetting;
-use App\Models\Post;
-use App\Models\Teacher;
+use App\Models\Alumni;
+use App\Models\CurriculumSetting;
 use App\Models\Extracurricular;
 use App\Models\Faq;
-use App\Models\Program;
-use App\Models\SiteSetting;
-use App\Models\AcademicCalendarContent;
-use App\Models\Alumni;
 use App\Models\Gallery;
 use App\Models\LandingPageSetting;
-use App\Models\CurriculumSetting;
-use App\Models\SchoolProfileSetting;
-use App\Models\SpmbSetting;
+use App\Models\Post;
+use App\Models\Program;
 use App\Models\ProgramStudiSetting;
 use App\Models\PtnAdmission;
+use App\Models\RagDocument;
+use App\Models\SchoolProfileSetting;
+use App\Models\SiteSetting;
+use App\Models\SpmbSetting;
+use App\Models\Teacher;
 use App\Models\TkaAverage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -28,9 +27,13 @@ use Illuminate\Support\Str;
 class RagService
 {
     protected GroqService $groq;
+
     protected EmbeddingService $embeddingService;
+
     protected int $chunkSize = 512; // tokens per chunk
+
     protected int $chunkOverlap = 50; // overlap tokens
+
     protected bool $pgvectorAvailable;
 
     public function __construct(
@@ -53,9 +56,11 @@ class RagService
 
         try {
             $result = DB::select("SELECT COUNT(*) as count FROM pg_extension WHERE extname = 'vector'");
+
             return ($result[0]->count ?? 0) > 0;
         } catch (\Exception $e) {
             Log::warning('Could not check pgvector availability', ['error' => $e->getMessage()]);
+
             return false;
         }
     }
@@ -69,16 +74,18 @@ class RagService
 
         try {
             // Check if embedding service is available
-            if (!$this->embeddingService->isAvailable()) {
+            if (! $this->embeddingService->isAvailable()) {
                 Log::info('Embedding service unavailable, skipping vector search');
+
                 return [];
             }
 
             // 1. Generate embedding for query
             $queryEmbeddingResult = $this->embeddingService->createEmbedding($query, 'query');
 
-            if (!$queryEmbeddingResult['success']) {
+            if (! $queryEmbeddingResult['success']) {
                 Log::error('Query embedding failed', ['query' => $query]);
+
                 return [];
             }
 
@@ -95,6 +102,7 @@ class RagService
                 'query' => $query,
                 'error' => $e->getMessage(),
             ]);
+
             return [];
         }
     }
@@ -104,10 +112,10 @@ class RagService
      */
     protected function searchWithPgvector(array $queryEmbedding, int $topK): array
     {
-        $embeddingStr = '[' . implode(',', $queryEmbedding) . ']';
+        $embeddingStr = '['.implode(',', $queryEmbedding).']';
 
         $results = DB::select(
-            "SELECT 
+            'SELECT 
                 rdc.id,
                 rdc.content,
                 rdc.document_id,
@@ -120,13 +128,15 @@ class RagService
              WHERE rd.is_active = true
                AND (rdc.embedding <=> ?::vector) < 0.5
              ORDER BY rdc.embedding <=> ?::vector
-             LIMIT ?",
+             LIMIT ?',
             [$embeddingStr, $embeddingStr, $embeddingStr, $topK]
         );
 
         $chunksWithSimilarity = [];
         foreach ($results as $result) {
-            if ($result->similarity < 0.5) continue;
+            if ($result->similarity < 0.5) {
+                continue;
+            }
 
             $chunksWithSimilarity[] = [
                 'id' => $result->id,
@@ -148,8 +158,10 @@ class RagService
      */
     protected function searchWithFallback(array $queryEmbedding, int $topK): array
     {
-        // Get all active chunks
-        $chunks = DB::table('rag_document_chunks')
+        $results = [];
+        $minSimilarity = 0.5;
+
+        DB::table('rag_document_chunks')
             ->join('rag_documents', 'rag_documents.id', '=', 'rag_document_chunks.document_id')
             ->where('rag_documents.is_active', true)
             ->select(
@@ -161,39 +173,49 @@ class RagService
                 'rag_documents.title as document_title',
                 'rag_documents.category'
             )
-            ->get();
+            ->orderBy('rag_document_chunks.id')
+            ->chunk(200, function ($chunks) use ($queryEmbedding, $minSimilarity, &$results, $topK) {
+                foreach ($chunks as $chunk) {
+                    if (empty($chunk->embedding)) {
+                        continue;
+                    }
 
-        $results = [];
-        foreach ($chunks as $chunk) {
-            if (empty($chunk->embedding)) continue;
+                    $chunkEmbedding = $chunk->embedding;
+                    if (is_string($chunkEmbedding)) {
+                        $decoded = json_decode($chunkEmbedding, true);
+                        if (is_array($decoded)) {
+                            $chunkEmbedding = $decoded;
+                        }
+                    }
+                    if (! is_array($chunkEmbedding)) {
+                        continue;
+                    }
 
-            $chunkEmbedding = $chunk->embedding;
-            if (is_string($chunkEmbedding)) {
-                $decoded = json_decode($chunkEmbedding, true);
-                if (is_array($decoded)) {
-                    $chunkEmbedding = $decoded;
+                    $similarity = $this->cosineSimilarity($queryEmbedding, $chunkEmbedding);
+
+                    if ($similarity >= $minSimilarity) {
+                        $results[] = [
+                            'id' => $chunk->id,
+                            'content' => $chunk->content,
+                            'document_id' => $chunk->document_id,
+                            'document_title' => $chunk->document_title ?? 'Unknown',
+                            'category' => $chunk->category ?? 'Umum',
+                            'source' => 'rag_document',
+                            'similarity' => $similarity,
+                            'token_count' => $chunk->token_count ?? $this->estimateTokenCount($chunk->content),
+                        ];
+                    }
                 }
-            }
-            if (!is_array($chunkEmbedding)) continue;
 
-            $similarity = $this->cosineSimilarity($queryEmbedding, $chunkEmbedding);
+                $maxBuffered = max($topK * 2, 100);
+                if (count($results) > $maxBuffered) {
+                    usort($results, fn ($a, $b) => $b['similarity'] <=> $a['similarity']);
+                    $results = array_slice($results, 0, $maxBuffered);
+                }
+            });
 
-            if ($similarity >= 0.5) {
-                $results[] = [
-                    'id' => $chunk->id,
-                    'content' => $chunk->content,
-                    'document_id' => $chunk->document_id,
-                    'document_title' => $chunk->document_title ?? 'Unknown',
-                    'category' => $chunk->category ?? 'Umum',
-                    'source' => 'rag_document',
-                    'similarity' => $similarity,
-                    'token_count' => $chunk->token_count ?? $this->estimateTokenCount($chunk->content),
-                ];
-            }
-        }
+        usort($results, fn ($a, $b) => $b['similarity'] <=> $a['similarity']);
 
-        // Sort by similarity descending and limit
-        usort($results, fn($a, $b) => $b['similarity'] <=> $a['similarity']);
         return array_slice($results, 0, $topK);
     }
 
@@ -240,13 +262,13 @@ class RagService
         try {
             // 1. Search Site Settings (Profil, Kontak, Sejarah Sekolah)
             $siteSettings = SiteSetting::getCachedAll();
-            
+
             // Check if query is about school profile/contact/general info
             $schoolKeywords = [
-                'sejarah', 'profil', 'alamat', 'kontak', 'telepon', 'email', 'lokasi', 'maps', 
+                'sejarah', 'profil', 'alamat', 'kontak', 'telepon', 'email', 'lokasi', 'maps',
                 'dimana', 'hubungi', 'social', 'instagram', 'facebook', 'youtube', 'twitter',
                 'nomor', 'phone', 'telp', 'contact', 'tentang sekolah', 'info sekolah',
-                'visi', 'misi', 'deskripsi', 'gambaran'
+                'visi', 'misi', 'deskripsi', 'gambaran',
             ];
             $isSchoolInfoQuery = false;
             foreach ($schoolKeywords as $keyword) {
@@ -262,7 +284,7 @@ class RagService
                 $content .= "Alamat: {$general['address']}\n";
                 $content .= "Telepon: {$general['phone']}\n";
                 $content .= "Email: {$general['email']}\n";
-                
+
                 if (isset($siteSettings['social_media'])) {
                     $social = $siteSettings['social_media'];
                     $content .= "\nMedia Sosial:\n";
@@ -291,8 +313,8 @@ class RagService
             $posts = Post::where('status', 'published')
                 ->where(function ($q) use ($queryLower) {
                     $q->where('title', 'like', "%{$queryLower}%")
-                      ->orWhere('content', 'like', "%{$queryLower}%")
-                      ->orWhere('excerpt', 'like', "%{$queryLower}%");
+                        ->orWhere('content', 'like', "%{$queryLower}%")
+                        ->orWhere('excerpt', 'like', "%{$queryLower}%");
                 })
                 ->limit(2)
                 ->get();
@@ -300,13 +322,13 @@ class RagService
             foreach ($posts as $post) {
                 $results[] = [
                     'id' => $post->id,
-                    'content' => trim($post->excerpt . "\n\n" . substr(strip_tags($post->content), 0, 1000)),
+                    'content' => trim($post->excerpt."\n\n".substr(strip_tags($post->content), 0, 1000)),
                     'title' => $post->title,
                     'category' => $post->category,
                     'source' => 'database',
                     'table' => 'posts',
                     'type' => 'Berita',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $post->title . ' ' . $post->excerpt),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $post->title.' '.$post->excerpt),
                 ];
             }
 
@@ -314,7 +336,7 @@ class RagService
             $faqs = Faq::where('is_published', true)
                 ->where(function ($q) use ($queryLower) {
                     $q->where('question', 'like', "%{$queryLower}%")
-                      ->orWhere('answer', 'like', "%{$queryLower}%");
+                        ->orWhere('answer', 'like', "%{$queryLower}%");
                 })
                 ->limit(2)
                 ->get();
@@ -328,29 +350,29 @@ class RagService
                     'source' => 'database',
                     'table' => 'faqs',
                     'type' => 'FAQ',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $faq->question . ' ' . $faq->answer),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $faq->question.' '.$faq->answer),
                 ];
             }
 
             // 4. Search Programs (INCLUDING Program Studi/Peminatan: MIPA, IPS, Bahasa)
             $programs = Program::where(function ($q) use ($queryLower) {
-                    $q->where('title', 'like', "%{$queryLower}%")
-                      ->orWhere('description', 'like', "%{$queryLower}%")
-                      ->orWhere('category', 'like', "%{$queryLower}%");
-                })
+                $q->where('title', 'like', "%{$queryLower}%")
+                    ->orWhere('description', 'like', "%{$queryLower}%")
+                    ->orWhere('category', 'like', "%{$queryLower}%");
+            })
                 ->limit(3)
                 ->get();
 
             foreach ($programs as $program) {
                 $results[] = [
                     'id' => $program->id,
-                    'content' => trim(($program->description ?? $program->title) . "\n\nKategori: " . $program->category),
+                    'content' => trim(($program->description ?? $program->title)."\n\nKategori: ".$program->category),
                     'title' => $program->title,
                     'category' => $program->category,
                     'source' => 'database',
                     'table' => 'programs',
                     'type' => 'Program Sekolah',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $program->title . ' ' . ($program->description ?? '')),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $program->title.' '.($program->description ?? '')),
                 ];
             }
 
@@ -358,8 +380,8 @@ class RagService
             $extras = Extracurricular::where('is_active', true)
                 ->where(function ($q) use ($queryLower) {
                     $q->where('name', 'like', "%{$queryLower}%")
-                      ->orWhere('description', 'like', "%{$queryLower}%")
-                      ->orWhere('schedule', 'like', "%{$queryLower}%");
+                        ->orWhere('description', 'like', "%{$queryLower}%")
+                        ->orWhere('schedule', 'like', "%{$queryLower}%");
                 })
                 ->limit(2)
                 ->get();
@@ -367,30 +389,30 @@ class RagService
             foreach ($extras as $extra) {
                 $results[] = [
                     'id' => $extra->id,
-                    'content' => trim($extra->description . "\n\nJadwal: " . $extra->schedule),
+                    'content' => trim($extra->description."\n\nJadwal: ".$extra->schedule),
                     'title' => $extra->name,
                     'category' => 'Ekstrakurikuler',
                     'source' => 'database',
                     'table' => 'extracurriculars',
                     'type' => 'Kegiatan',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $extra->name . ' ' . $extra->description),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $extra->name.' '.$extra->description),
                 ];
             }
 
             // 6. Search Teachers (Guru & Staff)
             // Check if this is a list query for teachers
             $isTeacherListQuery = $this->isTeacherListQuery($queryLower);
-            
+
             // If query is about program/major (IPA/IPS/Bahasa), don't show teacher list
-            $isProgramQuery = str_contains($queryLower, 'mipa') || str_contains($queryLower, 'ipa') || 
+            $isProgramQuery = str_contains($queryLower, 'mipa') || str_contains($queryLower, 'ipa') ||
                 str_contains($queryLower, 'ips') || str_contains($queryLower, 'bahasa') ||
                 str_contains($queryLower, 'jurusan') || str_contains($queryLower, 'program') ||
                 str_contains($queryLower, 'peminatan');
-            
-            if ($isTeacherListQuery && !$isProgramQuery) {
+
+            if ($isTeacherListQuery && ! $isProgramQuery) {
                 // For list queries, get all active teachers and create a summary chunk
-                $isStaffQuery = str_contains($queryLower, 'staff') || 
-                               str_contains($queryLower, 'tata usaha') || 
+                $isStaffQuery = str_contains($queryLower, 'staff') ||
+                               str_contains($queryLower, 'tata usaha') ||
                                str_contains($queryLower, 'manajemen') ||
                                str_contains($queryLower, 'humas') ||
                                str_contains($queryLower, 'kesiswaan') ||
@@ -401,24 +423,24 @@ class RagService
                     ->orderBy('department')
                     ->orderBy('name')
                     ->get();
-                
+
                 if ($allTeachers->isNotEmpty()) {
                     // Create a comprehensive teacher list as a single chunk
                     $teacherList = [];
                     $totalCount = $allTeachers->count();
-                    
+
                     foreach ($allTeachers->take(20) as $t) { // Limit to 20 for context size
                         $dept = $t->department ? " [{$t->department}]" : '';
                         $pos = $t->position ? " ({$t->position})" : '';
                         $teacherList[] = "- {$t->name}{$pos}{$dept}";
                     }
-                    
+
                     $remainingCount = max(0, $totalCount - 20);
                     $teacherListText = implode("\n", $teacherList);
                     if ($remainingCount > 0) {
                         $teacherListText .= "\n- ... dan {$remainingCount} {$teacherType} lainnya";
                     }
-                    
+
                     $typeLabel = $teacherType === 'staff' ? 'Staff/Tata Usaha' : 'Guru';
                     $results[] = [
                         'id' => 'teacher_list_summary',
@@ -436,8 +458,8 @@ class RagService
                 $teachers = Teacher::where('is_active', true)
                     ->where(function ($q) use ($queryLower) {
                         $q->where('name', 'like', "%{$queryLower}%")
-                          ->orWhere('position', 'like', "%{$queryLower}%")
-                          ->orWhere('department', 'like', "%{$queryLower}%");
+                            ->orWhere('position', 'like', "%{$queryLower}%")
+                            ->orWhere('department', 'like', "%{$queryLower}%");
                     })
                     ->limit(3)
                     ->get();
@@ -445,22 +467,22 @@ class RagService
                 foreach ($teachers as $teacher) {
                     $results[] = [
                         'id' => $teacher->id,
-                        'content' => trim($teacher->position . "\n\nDepartemen: " . ($teacher->department ?? '-')),
+                        'content' => trim($teacher->position."\n\nDepartemen: ".($teacher->department ?? '-')),
                         'title' => $teacher->name,
                         'category' => $teacher->type === 'guru' ? 'Guru' : 'Staff',
                         'source' => 'database',
                         'table' => 'teachers',
                         'type' => 'Tenaga Pendidik',
-                        'similarity' => $this->calculateKeywordMatch($queryLower, $teacher->name . ' ' . $teacher->position),
+                        'similarity' => $this->calculateKeywordMatch($queryLower, $teacher->name.' '.$teacher->position),
                     ];
                 }
             }
-            
+
             // If query is about program (IPA/IPS/Bahasa), search for program info not teachers
             if ($isProgramQuery) {
                 // Map IPA query to MIPA for search
                 $searchTerms = [$queryLower];
-                if (str_contains($queryLower, 'ipa') && !str_contains($queryLower, 'mipa')) {
+                if (str_contains($queryLower, 'ipa') && ! str_contains($queryLower, 'mipa')) {
                     $searchTerms[] = 'mipa';
                 }
 
@@ -469,8 +491,8 @@ class RagService
                     ->where(function ($q) use ($searchTerms) {
                         foreach ($searchTerms as $term) {
                             $q->orWhere('title', 'like', "%{$term}%")
-                              ->orWhere('description', 'like', "%{$term}%")
-                              ->orWhere('category', 'like', "%{$term}%");
+                                ->orWhere('description', 'like', "%{$term}%")
+                                ->orWhere('category', 'like', "%{$term}%");
                         }
                     })
                     ->limit(3)
@@ -478,7 +500,7 @@ class RagService
 
                 foreach ($programs as $program) {
                     $results[] = [
-                        'id' => 'program_' . $program->id,
+                        'id' => 'program_'.$program->id,
                         'content' => trim($program->description ?? ''),
                         'title' => $program->title,
                         'category' => $program->category ?? 'Program',
@@ -502,14 +524,14 @@ class RagService
                     $programNames[] = 'BAHASA';
                 }
 
-                if (!empty($programNames)) {
+                if (! empty($programNames)) {
                     $ragProgramDocs = \App\Models\RagDocument::where('file_type', 'database')
                         ->where('category', 'Program Studi')
                         ->where('is_active', true)
                         ->where(function ($q) use ($programNames) {
                             foreach ($programNames as $progName) {
                                 $q->orWhere('title', 'like', "%{$progName}%")
-                                  ->orWhere('content', 'like', "%{$progName}%");
+                                    ->orWhere('content', 'like', "%{$progName}%");
                             }
                         })
                         ->limit(10)
@@ -517,7 +539,7 @@ class RagService
 
                     foreach ($ragProgramDocs as $doc) {
                         $results[] = [
-                            'id' => 'rag_' . $doc->id,
+                            'id' => 'rag_'.$doc->id,
                             'content' => $doc->content,
                             'title' => $doc->title,
                             'category' => 'Program Studi Detail',
@@ -534,8 +556,8 @@ class RagService
             $alumni = Alumni::where('is_published', true)
                 ->where(function ($q) use ($queryLower) {
                     $q->where('name', 'like', "%{$queryLower}%")
-                      ->orWhere('testimonial', 'like', "%{$queryLower}%")
-                      ->orWhere('graduation_year', 'like', "%{$queryLower}%");
+                        ->orWhere('testimonial', 'like', "%{$queryLower}%")
+                        ->orWhere('graduation_year', 'like', "%{$queryLower}%");
                 })
                 ->limit(2)
                 ->get();
@@ -543,35 +565,35 @@ class RagService
             foreach ($alumni as $item) {
                 $results[] = [
                     'id' => $item->id,
-                    'content' => trim(($item->testimonial ?? '') . "\n\nAngkatan: " . ($item->graduation_year ?? '-')),
+                    'content' => trim(($item->testimonial ?? '')."\n\nAngkatan: ".($item->graduation_year ?? '-')),
                     'title' => $item->name,
                     'category' => 'Alumni',
                     'source' => 'database',
                     'table' => 'alumni',
                     'type' => 'Alumni',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->name . ' ' . ($item->testimonial ?? '')),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->name.' '.($item->testimonial ?? '')),
                 ];
             }
 
             // 8. Search Gallery
             $galleries = Gallery::where(function ($q) use ($queryLower) {
-                    $q->where('title', 'like', "%{$queryLower}%")
-                      ->orWhere('description', 'like', "%{$queryLower}%")
-                      ->orWhere('category', 'like', "%{$queryLower}%");
-                })
+                $q->where('title', 'like', "%{$queryLower}%")
+                    ->orWhere('description', 'like', "%{$queryLower}%")
+                    ->orWhere('category', 'like', "%{$queryLower}%");
+            })
                 ->limit(2)
                 ->get();
 
             foreach ($galleries as $item) {
                 $results[] = [
                     'id' => $item->id,
-                    'content' => trim(($item->description ?? '') . "\n\nKategori: " . ($item->category ?? '-')),
+                    'content' => trim(($item->description ?? '')."\n\nKategori: ".($item->category ?? '-')),
                     'title' => $item->title,
                     'category' => 'Galeri',
                     'source' => 'database',
                     'table' => 'galleries',
                     'type' => 'Galeri',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->title . ' ' . ($item->description ?? '')),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->title.' '.($item->description ?? '')),
                 ];
             }
 
@@ -579,7 +601,7 @@ class RagService
             $calendarItems = AcademicCalendarContent::where('is_active', true)
                 ->where(function ($q) use ($queryLower) {
                     $q->where('title', 'like', "%{$queryLower}%")
-                      ->orWhere('academic_year_start', 'like', "%{$queryLower}%");
+                        ->orWhere('academic_year_start', 'like', "%{$queryLower}%");
                 })
                 ->limit(2)
                 ->get();
@@ -587,21 +609,21 @@ class RagService
             foreach ($calendarItems as $item) {
                 $results[] = [
                     'id' => $item->id,
-                    'content' => trim('Semester: ' . ($item->semester_name ?? '-') . "\nTahun Ajaran: " . ($item->academic_year ?? '-')),
+                    'content' => trim('Semester: '.($item->semester_name ?? '-')."\nTahun Ajaran: ".($item->academic_year ?? '-')),
                     'title' => $item->title,
                     'category' => 'Kalender Akademik',
                     'source' => 'database',
                     'table' => 'academic_calendar_contents',
                     'type' => 'Kalender Akademik',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->title . ' ' . ($item->academic_year ?? '')),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->title.' '.($item->academic_year ?? '')),
                 ];
             }
 
             // 10. Search Landing Page Settings content
             $landingSettings = LandingPageSetting::where(function ($q) use ($queryLower) {
-                    $q->where('section_key', 'like', "%{$queryLower}%")
-                      ->orWhere('content', 'like', "%{$queryLower}%");
-                })
+                $q->where('section_key', 'like', "%{$queryLower}%")
+                    ->orWhere('content', 'like', "%{$queryLower}%");
+            })
                 ->limit(3)
                 ->get();
 
@@ -610,20 +632,20 @@ class RagService
                 $results[] = [
                     'id' => $item->id,
                     'content' => Str::limit((string) $content, 1200),
-                    'title' => 'Landing: ' . $item->section_key,
+                    'title' => 'Landing: '.$item->section_key,
                     'category' => 'Landing Page',
                     'source' => 'database',
                     'table' => 'landing_page_settings',
                     'type' => 'Landing',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->section_key . ' ' . (string) $content),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->section_key.' '.(string) $content),
                 ];
             }
 
             // 11. Search Curriculum Settings
             $curriculumSettings = CurriculumSetting::where(function ($q) use ($queryLower) {
-                    $q->where('section_key', 'like', "%{$queryLower}%")
-                      ->orWhere('content', 'like', "%{$queryLower}%");
-                })
+                $q->where('section_key', 'like', "%{$queryLower}%")
+                    ->orWhere('content', 'like', "%{$queryLower}%");
+            })
                 ->limit(3)
                 ->get();
 
@@ -632,20 +654,20 @@ class RagService
                 $results[] = [
                     'id' => $item->id,
                     'content' => Str::limit((string) $content, 1200),
-                    'title' => 'Kurikulum: ' . $item->section_key,
+                    'title' => 'Kurikulum: '.$item->section_key,
                     'category' => 'Kurikulum',
                     'source' => 'database',
                     'table' => 'curriculum_settings',
                     'type' => 'Kurikulum',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->section_key . ' ' . (string) $content),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->section_key.' '.(string) $content),
                 ];
             }
 
             // 12. Search School Profile Settings
             $profileSettings = SchoolProfileSetting::where(function ($q) use ($queryLower) {
-                    $q->where('section_key', 'like', "%{$queryLower}%")
-                      ->orWhere('content', 'like', "%{$queryLower}%");
-                })
+                $q->where('section_key', 'like', "%{$queryLower}%")
+                    ->orWhere('content', 'like', "%{$queryLower}%");
+            })
                 ->limit(3)
                 ->get();
 
@@ -654,20 +676,20 @@ class RagService
                 $results[] = [
                     'id' => $item->id,
                     'content' => Str::limit((string) $content, 1200),
-                    'title' => 'Profil: ' . $item->section_key,
+                    'title' => 'Profil: '.$item->section_key,
                     'category' => 'Profil Sekolah',
                     'source' => 'database',
                     'table' => 'school_profile_settings',
                     'type' => 'Profil Sekolah',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->section_key . ' ' . (string) $content),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->section_key.' '.(string) $content),
                 ];
             }
 
             // 13. Search SPMB Settings
             $spmbSettings = SpmbSetting::where(function ($q) use ($queryLower) {
-                    $q->where('section_key', 'like', "%{$queryLower}%")
-                      ->orWhere('content', 'like', "%{$queryLower}%");
-                })
+                $q->where('section_key', 'like', "%{$queryLower}%")
+                    ->orWhere('content', 'like', "%{$queryLower}%");
+            })
                 ->limit(3)
                 ->get();
 
@@ -676,21 +698,21 @@ class RagService
                 $results[] = [
                     'id' => $item->id,
                     'content' => Str::limit((string) $content, 1200),
-                    'title' => 'SPMB: ' . $item->section_key,
+                    'title' => 'SPMB: '.$item->section_key,
                     'category' => 'SPMB',
                     'source' => 'database',
                     'table' => 'spmb_settings',
                     'type' => 'SPMB',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->section_key . ' ' . (string) $content),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->section_key.' '.(string) $content),
                 ];
             }
 
             // 14. Search Program Studi Settings
             $prodiSettings = ProgramStudiSetting::where(function ($q) use ($queryLower) {
-                    $q->where('program_name', 'like', "%{$queryLower}%")
-                      ->orWhere('section_key', 'like', "%{$queryLower}%")
-                      ->orWhere('content', 'like', "%{$queryLower}%");
-                })
+                $q->where('program_name', 'like', "%{$queryLower}%")
+                    ->orWhere('section_key', 'like', "%{$queryLower}%")
+                    ->orWhere('content', 'like', "%{$queryLower}%");
+            })
                 ->limit(3)
                 ->get();
 
@@ -699,12 +721,12 @@ class RagService
                 $results[] = [
                     'id' => $item->id,
                     'content' => Str::limit((string) $content, 1200),
-                    'title' => $item->program_name . ' - ' . $item->section_key,
+                    'title' => $item->program_name.' - '.$item->section_key,
                     'category' => 'Program Studi',
                     'source' => 'database',
                     'table' => 'program_studi_settings',
                     'type' => 'Program Studi',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->program_name . ' ' . $item->section_key . ' ' . (string) $content),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->program_name.' '.$item->section_key.' '.(string) $content),
                 ];
             }
 
@@ -712,15 +734,15 @@ class RagService
             $ptnAdmissions = PtnAdmission::with(['university', 'batch'])
                 ->where(function ($q) use ($queryLower) {
                     $q->where('program_studi', 'like', "%{$queryLower}%")
-                      ->orWhereHas('university', function ($uq) use ($queryLower) {
-                          $uq->where('name', 'like', "%{$queryLower}%")
-                             ->orWhere('short_name', 'like', "%{$queryLower}%");
-                      })
-                      ->orWhereHas('batch', function ($bq) use ($queryLower) {
-                          $bq->where('name', 'like', "%{$queryLower}%")
-                             ->orWhere('type', 'like', "%{$queryLower}%")
-                             ->orWhere('year', 'like', "%{$queryLower}%");
-                      });
+                        ->orWhereHas('university', function ($uq) use ($queryLower) {
+                            $uq->where('name', 'like', "%{$queryLower}%")
+                                ->orWhere('short_name', 'like', "%{$queryLower}%");
+                        })
+                        ->orWhereHas('batch', function ($bq) use ($queryLower) {
+                            $bq->where('name', 'like', "%{$queryLower}%")
+                                ->orWhere('type', 'like', "%{$queryLower}%")
+                                ->orWhere('year', 'like', "%{$queryLower}%");
+                        });
                 })
                 ->limit(5)
                 ->get();
@@ -732,7 +754,7 @@ class RagService
                 $results[] = [
                     'id' => $item->id,
                     'content' => $content,
-                    'title' => $uni . ' - ' . $item->program_studi,
+                    'title' => $uni.' - '.$item->program_studi,
                     'category' => 'Serapan PTN',
                     'source' => 'database',
                     'table' => 'ptn_admissions',
@@ -743,10 +765,10 @@ class RagService
 
             // 16. Search TKA Averages
             $tkaAverages = TkaAverage::where(function ($q) use ($queryLower) {
-                    $q->where('academic_year', 'like', "%{$queryLower}%")
-                      ->orWhere('exam_type', 'like', "%{$queryLower}%")
-                      ->orWhere('subject_name', 'like', "%{$queryLower}%");
-                })
+                $q->where('academic_year', 'like', "%{$queryLower}%")
+                    ->orWhere('exam_type', 'like', "%{$queryLower}%")
+                    ->orWhere('subject_name', 'like', "%{$queryLower}%");
+            })
                 ->limit(8)
                 ->get();
 
@@ -755,7 +777,7 @@ class RagService
                 $results[] = [
                     'id' => $item->id,
                     'content' => $content,
-                    'title' => $item->subject_name . ' - ' . $item->academic_year,
+                    'title' => $item->subject_name.' - '.$item->academic_year,
                     'category' => 'Rata-rata TKA',
                     'source' => 'database',
                     'table' => 'tka_averages',
@@ -768,23 +790,23 @@ class RagService
             $seragams = \App\Models\Seragam::where('is_active', true)
                 ->where(function ($q) use ($queryLower) {
                     $q->where('name', 'like', "%{$queryLower}%")
-                      ->orWhere('description', 'like', "%{$queryLower}%")
-                      ->orWhere('category', 'like', "%{$queryLower}%");
+                        ->orWhere('description', 'like', "%{$queryLower}%")
+                        ->orWhere('category', 'like', "%{$queryLower}%");
                 })
                 ->limit(3)
                 ->get();
 
             foreach ($seragams as $item) {
-                $days = !empty($item->usage_days) ? implode(', ', $item->usage_days) : '-';
+                $days = ! empty($item->usage_days) ? implode(', ', $item->usage_days) : '-';
                 $results[] = [
                     'id' => $item->id,
-                    'content' => trim(($item->description ?? '') . "\n\nHari: {$days}\n\nAturan: " . strip_tags($item->rules ?? '-')),
+                    'content' => trim(($item->description ?? '')."\n\nHari: {$days}\n\nAturan: ".strip_tags($item->rules ?? '-')),
                     'title' => $item->name,
                     'category' => 'Seragam Sekolah',
                     'source' => 'database',
                     'table' => 'seragams',
                     'type' => 'Seragam',
-                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->name . ' ' . ($item->description ?? '')),
+                    'similarity' => $this->calculateKeywordMatch($queryLower, $item->name.' '.($item->description ?? '')),
                 ];
             }
 
@@ -799,6 +821,7 @@ class RagService
                 'query' => $query,
                 'error' => $e->getMessage(),
             ]);
+
             return [];
         }
     }
@@ -838,11 +861,12 @@ class RagService
             foreach ($chunks as $index => $chunkText) {
                 $embeddingResult = $this->embeddingService->createEmbedding($chunkText, 'passage');
 
-                if (!$embeddingResult['success']) {
+                if (! $embeddingResult['success']) {
                     Log::error('Failed to generate embedding', [
                         'document_id' => $document->id,
                         'chunk_index' => $index,
                     ]);
+
                     continue;
                 }
 
@@ -852,10 +876,10 @@ class RagService
                 try {
                     if ($this->pgvectorAvailable) {
                         // Store with pgvector
-                        $embeddingStr = '[' . implode(',', $embedding) . ']';
+                        $embeddingStr = '['.implode(',', $embedding).']';
                         DB::statement(
-                            "INSERT INTO rag_document_chunks (document_id, content, chunk_index, token_count, embedding, created_at, updated_at)
-                             VALUES (?, ?, ?, ?, ?::vector, NOW(), NOW())",
+                            'INSERT INTO rag_document_chunks (document_id, content, chunk_index, token_count, embedding, created_at, updated_at)
+                             VALUES (?, ?, ?, ?, ?::vector, NOW(), NOW())',
                             [$document->id, $chunkText, $index, $tokenCount, $embeddingStr]
                         );
                     } else {
@@ -870,7 +894,7 @@ class RagService
                             'updated_at' => now(),
                         ]);
                     }
-                    
+
                     Log::info('Chunk stored successfully', [
                         'document_id' => $document->id,
                         'chunk_index' => $index,
@@ -903,6 +927,7 @@ class RagService
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return false;
         }
     }
@@ -914,7 +939,7 @@ class RagService
     protected function getDatabaseQuickReply(string $query): ?array
     {
         $query = strtolower($query);
-        
+
         // More specific keyword matching with combined keywords
         // Format: 'key' => [primary_keywords, secondary_keywords (must be in title), category]
         $keywordMap = [
@@ -922,19 +947,19 @@ class RagService
                 'primary' => ['ppdb', 'penerimaan peserta didik baru', 'pendaftaran'],
                 'title_must_contain' => ['ppdb', 'pendaftaran', 'penerimaan'],
                 'category' => 'PPDB',
-                'table' => 'posts'
+                'table' => 'posts',
             ],
             'biaya' => [
                 'primary' => ['biaya sekolah', 'spp', 'uang sekolah', 'pembayaran'],
                 'title_must_contain' => ['biaya', 'spp', 'pembayaran', 'gratis'],
                 'category' => 'Informasi',
-                'table' => 'posts'
+                'table' => 'posts',
             ],
             'program_studi' => [
                 'primary' => ['program studi', 'peminatan', 'jurusan', 'mipa', 'ipa ', 'ipa?', 'ipa!', 'ipa,', '.ipa', 'ipa', 'ips ', 'ips?', 'ips!', 'ips,', '.ips', 'ips', 'bahasa'],
                 'title_must_contain' => ['program', 'peminatan', 'jurusan', 'mipa', 'ipa', 'ips', 'bahasa'],
                 'category' => null,
-                'table' => 'programs'
+                'table' => 'programs',
             ],
         ];
 
@@ -948,7 +973,7 @@ class RagService
                 }
             }
 
-            if (!$hasPrimaryKeyword) {
+            if (! $hasPrimaryKeyword) {
                 continue; // Skip if no primary keyword found
             }
 
@@ -970,8 +995,8 @@ class RagService
 
                     if ($post) {
                         $excerpt = strip_tags($post->content);
-                        $excerpt = substr($excerpt, 0, 300) . '...';
-                        
+                        $excerpt = substr($excerpt, 0, 300).'...';
+
                         return [
                             'found' => true,
                             'source' => 'post',
@@ -980,7 +1005,7 @@ class RagService
                                 $post->title,
                                 $excerpt,
                                 url("/berita/{$post->slug}")
-                            )
+                            ),
                         ];
                     }
                 } elseif ($config['table'] === 'programs') {
@@ -988,7 +1013,7 @@ class RagService
                         ->where(function ($q) use ($config) {
                             foreach ($config['title_must_contain'] as $keyword) {
                                 $q->orWhere('title', 'like', "%{$keyword}%")
-                                  ->orWhere('description', 'like', "%{$keyword}%");
+                                    ->orWhere('description', 'like', "%{$keyword}%");
                             }
                         })
                         ->first();
@@ -1001,8 +1026,8 @@ class RagService
                                 "**%s**\n\n%s\n\n%s",
                                 $program->title,
                                 $program->description,
-                                $program->link ? "📖 Info lengkap: " . url($program->link) : ""
-                            )
+                                $program->link ? '📖 Info lengkap: '.url($program->link) : ''
+                            ),
                         ];
                     }
                 }
@@ -1016,14 +1041,14 @@ class RagService
 
         // Check for teacher/guru list queries
         // Only trigger if query is specifically about teachers/staff/management
-        $isTeacherQuery = str_contains($query, ' daftar guru') || str_contains($query, 'list guru') || 
+        $isTeacherQuery = str_contains($query, ' daftar guru') || str_contains($query, 'list guru') ||
             str_contains($query, 'siapa guru') || str_contains($query, 'siapa saja guru') ||
-            str_contains($query, 'tenaga pendidik') || 
+            str_contains($query, 'tenaga pendidik') ||
             str_contains($query, 'staff') || str_contains($query, 'tata usaha') ||
-            str_contains($query, 'manajemen') || str_contains($query, 'humas') || 
+            str_contains($query, 'manajemen') || str_contains($query, 'humas') ||
             str_contains($query, 'kesiswaan') || str_contains($query, 'kurikulum') ||
             ($query === 'guru') || str_starts_with($query, 'guru ') || str_ends_with($query, ' guru');
-        
+
         if ($isTeacherQuery) {
             return $this->getTeacherListReply($query);
         }
@@ -1039,10 +1064,10 @@ class RagService
     {
         try {
             $queryLower = strtolower($query);
-            
+
             // Determine what type of teacher data to retrieve
-            $isStaffQuery = str_contains($queryLower, 'staff') || 
-                           str_contains($queryLower, 'tata usaha') || 
+            $isStaffQuery = str_contains($queryLower, 'staff') ||
+                           str_contains($queryLower, 'tata usaha') ||
                            str_contains($queryLower, 'tu') ||
                            str_contains($queryLower, 'manajemen') ||
                            str_contains($queryLower, 'humas') ||
@@ -1089,31 +1114,31 @@ class RagService
             }
 
             $departmentFilterTerms = array_values(array_unique($departmentFilterTerms));
-            if (!empty($departmentFilterTerms)) {
+            if (! empty($departmentFilterTerms)) {
                 $isSpecificDepartment = true;
                 $departmentFilter = implode(', ', $departmentFilterTerms);
             }
-            
+
             // Build query
             $teacherQuery = Teacher::where('is_active', true);
-            
+
             if ($isStaffQuery) {
                 $teacherQuery->where('type', 'staff');
             } else {
                 $teacherQuery->where('type', 'guru');
             }
-            
-            if ($isSpecificDepartment && !empty($departmentFilterTerms)) {
+
+            if ($isSpecificDepartment && ! empty($departmentFilterTerms)) {
                 // Case-insensitive partial match for one or more department terms
                 $teacherQuery->where(function ($q) use ($departmentFilterTerms) {
                     foreach ($departmentFilterTerms as $term) {
-                        $q->orWhereRaw('LOWER(COALESCE(department, \'\')) LIKE ?', ['%' . strtolower($term) . '%']);
+                        $q->orWhereRaw('LOWER(COALESCE(department, \'\')) LIKE ?', ['%'.strtolower($term).'%']);
                     }
                 });
             }
-            
+
             $teachers = $teacherQuery->orderBy('position', 'asc')->orderBy('name', 'asc')->get();
-            
+
             if ($teachers->isEmpty()) {
                 return [
                     'found' => true,
@@ -1121,11 +1146,11 @@ class RagService
                     'source' => 'database',
                 ];
             }
-            
+
             // Build response message
             $totalCount = $teachers->count();
             $typeLabel = $isStaffQuery ? 'Staff' : 'Guru';
-            
+
             if ($isSpecificDepartment) {
                 $deptDisplay = $departmentFilter;
                 $message = "✨ **Daftar {$typeLabel} {$deptDisplay} SMAN 1 Baleendah** ✨\n\n";
@@ -1134,37 +1159,38 @@ class RagService
                 $message = "✨ **Daftar {$typeLabel} SMAN 1 Baleendah** ✨\n\n";
                 $message .= "Total: {$totalCount} {$typeLabel}\n\n";
             }
-            
+
             // Group by department/position for better organization
             $grouped = $teachers->groupBy('department');
-            
+
             foreach ($grouped as $department => $group) {
                 $deptName = $department ?: 'Umum';
                 $message .= "📚 *{$deptName}*\n";
-                
+
                 foreach ($group->take(10) as $teacher) { // Limit 10 per department to avoid too long message
                     $position = $teacher->position ? " ({$teacher->position})" : '';
                     $message .= "• {$teacher->name}{$position}\n";
                 }
-                
+
                 if ($group->count() > 10) {
                     $remaining = $group->count() - 10;
                     $message .= "• ... dan {$remaining} lainnya\n";
                 }
-                
+
                 $message .= "\n";
             }
-            
+
             $message .= "💡 *Mau tau detail lengkap tentang salah satu {$typeLabel}? Tanya aja namanya!*";
-            
+
             return [
                 'found' => true,
                 'message' => $message,
                 'source' => 'database',
             ];
-            
+
         } catch (\Exception $e) {
             Log::error('Teacher list reply failed', ['error' => $e->getMessage()]);
+
             return ['found' => false];
         }
     }
@@ -1176,29 +1202,31 @@ class RagService
     {
         $startTime = microtime(true);
         $requestId = uniqid('rag_', true);
-        
+
         Log::info('[RagService] ========== RAG REQUEST STARTED ==========', [
             'request_id' => $requestId,
             'user_query' => substr($userQuery, 0, 100),
             'history_count' => count($conversationHistory),
         ]);
-        
+
         // 1. Check if RAG is enabled
         $ragEnabled = AiSetting::get('rag_enabled', true);
-        
+
         Log::info('[RagService] RAG settings', [
             'request_id' => $requestId,
             'rag_enabled' => $ragEnabled,
         ]);
 
-        if (!$ragEnabled) {
+        if (! $ragEnabled) {
             Log::info('[RagService] RAG disabled, using simple response', ['request_id' => $requestId]);
+
             return $this->generateSimpleResponse($userQuery, $conversationHistory);
         }
 
         // 2. Guardrails: Check if query is school-related
-        if (!$this->isSchoolRelatedQuery($userQuery)) {
+        if (! $this->isSchoolRelatedQuery($userQuery)) {
             Log::info('[RagService] Query not school-related', ['request_id' => $requestId]);
+
             return [
                 'success' => true,
                 'message' => "Eh, maaf ya! Aku ini AI SMANSA, jadi cuma bisa ngebantu tentang SMAN 1 Baleendah aja nih 😅\n\nKalo kamu mau tanya tentang:\n• PPDB dan pendaftaran\n• Jurusan (MIPA, IPS, Bahasa)\n• Ekstrakurikuler\n• Fasilitas sekolah\n• Info akademik\n\nAku siap banget bantu! Yuk, tanya aja~ ✨",
@@ -1215,6 +1243,7 @@ class RagService
                 'source' => $quickReply['source'] ?? 'unknown',
                 'elapsed_ms' => round((microtime(true) - $startTime) * 1000),
             ]);
+
             return [
                 'success' => true,
                 'message' => $quickReply['message'],
@@ -1247,6 +1276,7 @@ class RagService
 
         if (empty($allChunks)) {
             Log::info('[RagService] No relevant data found, falling back to simple response', ['request_id' => $requestId]);
+
             return $this->generateSimpleResponse($userQuery, $conversationHistory);
         }
 
@@ -1255,7 +1285,7 @@ class RagService
 
         // 6. Detect which provider will be used and choose appropriate system prompt
         $useSimplePrompt = $this->shouldUseSimplePrompt();
-        
+
         if ($useSimplePrompt) {
             // Ollama will be used - use simple prompt (better performance)
             $systemPrompt = $this->buildSimpleSystemPrompt();
@@ -1284,7 +1314,7 @@ class RagService
 
         // Add current query
         $messages[] = ['role' => 'user', 'content' => $userQuery];
-        
+
         Log::info('[RagService] Calling GroqService::chatCompletion', [
             'request_id' => $requestId,
             'num_messages' => count($messages),
@@ -1293,9 +1323,9 @@ class RagService
 
         // 7. Generate response
         $completionResult = $this->groq->chatCompletion($messages);
-        
+
         $totalElapsed = round((microtime(true) - $startTime) * 1000);
-        
+
         Log::info('[RagService] OpenAI completion result', [
             'request_id' => $requestId,
             'success' => $completionResult['success'] ?? false,
@@ -1305,11 +1335,12 @@ class RagService
             'total_elapsed_ms' => $totalElapsed,
         ]);
 
-        if (!$completionResult['success']) {
+        if (! $completionResult['success']) {
             Log::error('[RagService] Completion failed', [
                 'request_id' => $requestId,
                 'error' => $completionResult['error'] ?? 'unknown',
             ]);
+
             return [
                 'success' => false,
                 'message' => 'Maaf, terjadi kesalahan saat memproses pertanyaan Anda. Silakan coba lagi.',
@@ -1388,23 +1419,23 @@ Jawab dengan gaya yang asik dan ngenakin! 😊";
         // Build conversation history with validation and limit
         // Only keep last 5 exchanges (10 messages max) to prevent context overflow
         $recentHistory = array_slice($conversationHistory, -10);
-        
+
         foreach ($recentHistory as $msg) {
             // Skip invalid messages
-            if (!isset($msg['sender']) || !isset($msg['message'])) {
+            if (! isset($msg['sender']) || ! isset($msg['message'])) {
                 continue;
             }
-            
+
             // Ensure message content is string
             $content = is_string($msg['message']) ? $msg['message'] : (string) $msg['message'];
-            
+
             if (empty($content)) {
                 continue;
             }
-            
+
             // Truncate very long messages to prevent context overflow
             if (strlen($content) > 2000) {
-                $content = substr($content, 0, 2000) . '... (dipotong karena terlalu panjang)';
+                $content = substr($content, 0, 2000).'... (dipotong karena terlalu panjang)';
             }
 
             $messages[] = [
@@ -1416,21 +1447,21 @@ Jawab dengan gaya yang asik dan ngenakin! 😊";
         $messages[] = ['role' => 'user', 'content' => $userQuery];
 
         Log::info('[RagService] Calling OpenAI Service', [
-            'query' => $userQuery, 
+            'query' => $userQuery,
             'num_messages' => count($messages),
-            'messages_preview' => array_map(fn($m) => ['role' => $m['role'], 'length' => strlen($m['content'])], $messages)
+            'messages_preview' => array_map(fn ($m) => ['role' => $m['role'], 'length' => strlen($m['content'])], $messages),
         ]);
 
         $completionResult = $this->groq->chatCompletion($messages);
 
         Log::info('[RagService] OpenAI Result', [
             'success' => $completionResult['success'] ?? false,
-            'has_message' => isset($completionResult['message']) && !empty($completionResult['message']),
-            'has_error' => isset($completionResult['error']) && !empty($completionResult['error']),
+            'has_message' => isset($completionResult['message']) && ! empty($completionResult['message']),
+            'has_error' => isset($completionResult['error']) && ! empty($completionResult['error']),
             'message_preview' => isset($completionResult['message']) ? substr($completionResult['message'], 0, 100) : 'EMPTY',
         ]);
 
-        if (!$completionResult['success'] && isset($completionResult['error'])) {
+        if (! $completionResult['success'] && isset($completionResult['error'])) {
             Log::error('[RagService] OpenAI Error', ['error' => $completionResult['error']]);
         }
 
@@ -1462,19 +1493,19 @@ Jawab dengan gaya yang asik dan ngenakin! 😊";
         foreach ($sentences as $sentence) {
             $sentenceTokens = $this->estimateTokenCount($sentence);
 
-            if ($currentTokens + $sentenceTokens > $this->chunkSize && !empty($currentChunk)) {
+            if ($currentTokens + $sentenceTokens > $this->chunkSize && ! empty($currentChunk)) {
                 $chunks[] = trim($currentChunk);
                 // Keep overlap
                 $overlapText = $this->getLastNTokens($currentChunk, $this->chunkOverlap);
-                $currentChunk = $overlapText . ' ' . $sentence;
+                $currentChunk = $overlapText.' '.$sentence;
                 $currentTokens = $this->estimateTokenCount($currentChunk);
             } else {
-                $currentChunk .= ' ' . $sentence;
+                $currentChunk .= ' '.$sentence;
                 $currentTokens += $sentenceTokens;
             }
         }
 
-        if (!empty($currentChunk)) {
+        if (! empty($currentChunk)) {
             $chunks[] = trim($currentChunk);
         }
 
@@ -1497,6 +1528,7 @@ Jawab dengan gaya yang asik dan ngenakin! 😊";
     {
         $words = explode(' ', $text);
         $lastWords = array_slice($words, -$n);
+
         return implode(' ', $lastWords);
     }
 
@@ -1508,6 +1540,7 @@ Jawab dengan gaya yang asik dan ngenakin! 😊";
     {
         // Groq models are capable enough for enhanced RAG prompts
         return false;
+
         return true;
     }
 
@@ -1516,7 +1549,7 @@ Jawab dengan gaya yang asik dan ngenakin! 😊";
      */
     protected function buildSimpleSystemPrompt(): string
     {
-        return "Kamu adalah AI SMANSA, teman ngobrol santai dari SMAN 1 Baleendah. Bicara dengan gaya kekinian, friendly, dan kayak lagi chat sama teman!
+        return 'Kamu adalah AI SMANSA, teman ngobrol santai dari SMAN 1 Baleendah. Bicara dengan gaya kekinian, friendly, dan kayak lagi chat sama teman!
 
 📍 INFO PENTING SMANSA:
 - Alamat: Jl. R.A.A. Wiranatakoesoemah No.30, Baleendah, Bandung 40375
@@ -1527,19 +1560,19 @@ Jawab dengan gaya yang asik dan ngenakin! 😊";
 GAYA NGOMONG KAMU:
 1. Pake bahasa sehari-hari yang asik, gak kaku
 2. Boleh pake emoji biar lebih hidup dan seru ✨
-3. Selalu sapa dulu, misal \"Halo!\" atau \"Hai!\"
+3. Selalu sapa dulu, misal "Halo!" atau "Hai!"
 4. Jelasin dengan panjang yang pas - jangan terlalu pendek, jangan terlalu panjang
 5. Kalo info kurang lengkap, bilang dengan sopan dan kasih solusi
 6. Tunjukkan semangat dan antusiasme! Jangan monotone
-7. Selalu tutup dengan kalimat yang ngebantu user, misal \"Ada yang mau ditanya lagi?\" atau \"Mau tau info lain nggak?\"
+7. Selalu tutup dengan kalimat yang ngebantu user, misal "Ada yang mau ditanya lagi?" atau "Mau tau info lain nggak?"
 8. Kalo ditanya hal di luar sekolah, jelasin dengan baik sambil arahin ke topik sekolah
 9. Jawab dengan natural, kayak lagi ngobrol langsung
 
 CONTOH GAYA JAWAB:
-- \"Halo! Mau daftar SMANSA ya? Keren! Yuk, aku jelasin caranya...\"
-- \"Wah, info lengkapnya belum ada nih. Tapi tenang, kamu bisa hubungi sekolah langsung ya!\"
+- "Halo! Mau daftar SMANSA ya? Keren! Yuk, aku jelasin caranya..."
+- "Wah, info lengkapnya belum ada nih. Tapi tenang, kamu bisa hubungi sekolah langsung ya!"
 
-Yuk, jawab dengan gaya yang friendly dan ngenakin! 😊";
+Yuk, jawab dengan gaya yang friendly dan ngenakin! 😊';
     }
 
     /**
@@ -1617,15 +1650,15 @@ PROMPT;
 
         // Check if query has teacher intent with subject/department
         // e.g., "guru biologi", "guru matematika", "staff perpus"
-        $hasTeacherKeyword = str_contains($queryLower, 'guru') || 
+        $hasTeacherKeyword = str_contains($queryLower, 'guru') ||
                             str_contains($queryLower, 'staff') ||
                             str_contains($queryLower, 'pengajar');
-        
+
         $hasListIndicator = str_contains($queryLower, 'siapa') ||
                            str_contains($queryLower, 'daftar') ||
                            str_contains($queryLower, 'list') ||
                            str_contains($queryLower, 'semua');
-        
+
         // If query has teacher keyword + list intent, it's a teacher query
         // This catches queries like "guru biologi", "guru matematika", etc.
         if ($hasTeacherKeyword && $hasListIndicator) {
@@ -1636,7 +1669,7 @@ PROMPT;
         // These should go to Program/ProgramStudi search instead
         $programIndicators = [
             'jurusan', 'peminatan', 'program ', 'prodi', 'saintek', 'soshum',
-            'laboratorium', 'lab '
+            'laboratorium', 'lab ',
         ];
 
         foreach ($programIndicators as $indicator) {
@@ -1680,7 +1713,7 @@ PROMPT;
             'ips ', ' ips', 'sosiologi', 'geografi', 'ekonomi', 'sejarah',
             'bahasa', 'sastra', 'bhs ', 'bhs.', 'inggris', 'indonesia', 'jepang',
             'jurusan', 'peminatan', 'program studi', 'prodi',
-            'saintek', 'soshum', 'soshum'
+            'saintek', 'soshum', 'soshum',
         ];
 
         foreach ($programKeywords as $keyword) {
@@ -1698,7 +1731,7 @@ PROMPT;
     protected function isSchoolRelatedQuery(string $query): bool
     {
         $queryLower = mb_strtolower($query);
-        
+
         // Block known prompt injection attempts or jailbreak patterns
         $blockedPatterns = [
             'ignore previous instructions',
@@ -1716,6 +1749,7 @@ PROMPT;
         foreach ($blockedPatterns as $pattern) {
             if (str_contains($queryLower, $pattern)) {
                 Log::warning('[RagService] Potential prompt injection detected', ['query' => $query]);
+
                 return false;
             }
         }
@@ -1725,7 +1759,7 @@ PROMPT;
             // School names
             'sman', 'sekolah', 'baleendah', 'smansa', 'sma', 'negeri', 'man',
             // Registration & Admission
-            'ppdb', 'pendaftaran', 'daftar', 'online', 'offline', 'cara daftar', 
+            'ppdb', 'pendaftaran', 'daftar', 'online', 'offline', 'cara daftar',
             'cara mendaftar', 'syarat', 'dokumen', 'berkas', 'verifikasi', 'zonasi',
             'afirmasi', 'prestasi', 'mutasi', 'jalur', 'kuota', 'daya tampung',
             // Students & Teachers
@@ -1775,7 +1809,7 @@ PROMPT;
                 return true;
             }
         }
-        
+
         // If query is short, likely a simple greeting or single-word question - allow it
         if (strlen($query) < 20) {
             return true;
@@ -1786,15 +1820,16 @@ PROMPT;
         $words = preg_split('/\s+/', $queryLower);
         $genericWords = ['yang', 'dan', 'atau', 'dengan', 'untuk', 'dari', 'pada', 'dalam', 'saya', 'aku', 'kamu', 'kita'];
         $meaningfulWords = array_diff($words, $genericWords);
-        
-        // If query has meaningful content but not caught by allowed topics, 
+
+        // If query has meaningful content but not caught by allowed topics,
         // allow it and let the AI handle it gracefully
         if (count($meaningfulWords) > 0 && strlen($query) < 100) {
             Log::info('[RagService] Query allowed despite no keyword match', ['query' => $query]);
+
             return true;
         }
 
-        return false; 
+        return false;
     }
 
     /**
@@ -1811,7 +1846,7 @@ PROMPT;
         ];
 
         $responseLower = mb_strtolower($response);
-        
+
         foreach ($nonSchoolIndicators as $indicator) {
             if (str_contains($responseLower, $indicator)) {
                 return true;

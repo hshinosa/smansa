@@ -2,31 +2,30 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Facades\Vite;
-use Illuminate\Support\Facades\View;
-use Illuminate\Support\ServiceProvider;
+use App\Console\Commands\RagEvaluateRetrieval;
+use App\Console\Commands\RagReindexDbContent;
+use App\Models\AcademicCalendarContent;
+use App\Models\Alumni;
+use App\Models\CurriculumSetting;
+use App\Models\Extracurricular;
+use App\Models\Faq;
+use App\Models\Gallery;
+use App\Models\LandingPageSetting;
+use App\Models\Post;
+use App\Models\Program;
+use App\Models\ProgramStudiSetting;
+use App\Models\SchoolProfileSetting;
 use App\Models\SiteSetting;
+use App\Models\SpmbSetting;
+use App\Models\Teacher;
+use App\Observers\CacheInvalidationObserver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
-use App\Console\Commands\RagReindexDbContent;
-use App\Console\Commands\RagEvaluateRetrieval;
-use App\Observers\CacheInvalidationObserver;
-use App\Models\Post;
-use App\Models\Gallery;
-use App\Models\Teacher;
-use App\Models\Extracurricular;
-use App\Models\Faq;
-use App\Models\Alumni;
-use App\Models\AcademicCalendarContent;
-use App\Models\Program;
-use App\Models\LandingPageSetting;
-use App\Models\SpmbSetting;
-use App\Models\SchoolProfileSetting;
-use App\Models\ProgramStudiSetting;
-use App\Models\CurriculumSetting;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\Vite;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -54,7 +53,7 @@ class AppServiceProvider extends ServiceProvider
                 return response()->json([
                     'success' => false,
                     'message' => 'Terlalu banyak permintaan. Silakan coba lagi dalam satu menit.',
-                    'type' => 'error'
+                    'type' => 'error',
                 ], 429, $headers);
             });
         });
@@ -67,7 +66,15 @@ class AppServiceProvider extends ServiceProvider
         // Enable method spoofing for legacy HTML forms and some XHR clients
         \Illuminate\Http\Request::enableHttpMethodParameterOverride();
 
-        if ($this->app->environment('production')) {
+        $isDevHost = false;
+
+        if (! $this->app->runningInConsole()) {
+            $host = request()->getHost();
+            $isDevHost = in_array($host, ['localhost', '127.0.0.1', '[::1]'])
+                || str_starts_with($host, 'dev.');
+        }
+
+        if ($this->app->environment('production') && ! $isDevHost) {
             \Illuminate\Support\Facades\URL::forceScheme('https');
             \Illuminate\Support\Facades\URL::forceRootUrl(config('app.url'));
         }
@@ -94,7 +101,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Share site settings with all views using cache
         try {
-            if (!app()->runningInConsole() && Schema::hasTable('site_settings')) {
+            if (! app()->runningInConsole() && Schema::hasTable('site_settings')) {
                 // Cache site settings for performance
                 $settings = cache()->remember('site_settings_all', 3600, function () {
                     return SiteSetting::getCachedAll();

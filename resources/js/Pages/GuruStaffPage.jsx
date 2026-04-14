@@ -322,8 +322,20 @@ export default function GuruStaffPage({ teachers = [] }) {
                     src={getTeacherPhoto(teacher)}
                     alt={teacher.name}
                     className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
+                    loading="eager"
+                    fetchpriority="high"
+                    eager
                     style={{ objectPosition: 'center 20%' }}
+                    fallback={
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 text-center p-4">
+                            <div>
+                                <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                    <User className="h-8 w-8" />
+                                </div>
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Foto belum tersedia</p>
+                            </div>
+                        </div>
+                    }
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </div>
@@ -372,7 +384,13 @@ export default function GuruStaffPage({ teachers = [] }) {
                                 src={getTeacherPhoto(selectedTeacher)} 
                                 alt={selectedTeacher.name}
                                 className="w-32 h-32 rounded-full object-cover border-4 border-white"
-                                loading="lazy"
+                                loading="eager"
+                                eager
+                                fallback={
+                                    <div className="w-32 h-32 rounded-full border-4 border-white bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center text-primary shadow-lg">
+                                        <User className="w-12 h-12" />
+                                    </div>
+                                }
                             />
                         </div>
                     </div>

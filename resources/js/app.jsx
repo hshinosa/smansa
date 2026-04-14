@@ -5,20 +5,15 @@ import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import ChatWidget from '@/Components/ChatWidget';
+import ErrorBoundary from '@/Components/ErrorBoundary';
 import { Toaster } from 'react-hot-toast';
 import { route as ziggyRoute } from 'ziggy-js';
-import { usePerformanceMonitoring } from '@/Utils/performance';
 
 const route = (name, params, absolute) => {
     return ziggyRoute(name, params, absolute, window.Ziggy);
 };
 
 window.route = route;
-
-function AppWrapper({ Component, props }) {
-    usePerformanceMonitoring();
-    return <Component {...props} />;
-}
 
 createInertiaApp({
     resolve: (name) =>
@@ -31,7 +26,10 @@ createInertiaApp({
 
         root.render(
             <>
-                <AppWrapper Component={App} props={props} />
+                <ErrorBoundary>
+                    <App {...props} />
+                </ErrorBoundary>
+                <ChatWidget />
                 <Toaster position="top-right" />
             </>
         );

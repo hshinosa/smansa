@@ -14,19 +14,20 @@ class SecurityHeaders
         $response = $next($request);
 
         $host = $request->getHost();
-        $isDevHost = in_array($host, ['localhost', '127.0.0.1', '[::1]']);
+        $isDevHost = in_array($host, ['localhost', '127.0.0.1', '[::1]'])
+            || str_starts_with($host, 'dev.');
         $isLocal = app()->environment('local');
 
         // SECURITY FIX: Remove/obfuscate Server header to prevent technology stack disclosure
         // This prevents attackers from easily identifying server infrastructure
         $response->headers->remove('Server');
         $response->headers->remove('X-Powered-By');
-        
+
         // Option: Obfuscate instead of removing (uncomment to use)
         // $response->headers->set('Server', 'WebServer');
 
-        // Dev/test/local host: jangan set CSP supaya Vite/inline script tidak diblokir saat pengembangan.
-        if ($isLocal) {
+        // Dev/test/local host: jangan set CSP supaya asset dev tidak diblokir saat pengembangan.
+        if ($isLocal || $isDevHost) {
             return $response;
         }
 
@@ -42,7 +43,7 @@ class SecurityHeaders
             "frame-src 'self' https://www.google.com https://maps.google.com",
             "frame-ancestors 'self' *.sman1baleendah.sch.id *.hshinoshowcase.site",
             'upgrade-insecure-requests',
-            "report-uri /api/security/csp-report",
+            'report-uri /api/security/csp-report',
         ];
 
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
@@ -52,7 +53,7 @@ class SecurityHeaders
         $response->headers->set('Cross-Origin-Resource-Policy', 'same-origin');
         $response->headers->set('Cross-Origin-Opener-Policy', 'same-origin');
         $response->headers->set('Content-Security-Policy', implode('; ', $csp));
-        
+
         // HSTS (HTTP Strict Transport Security)
         // Max-age: 1 year (31536000 seconds)
         $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');

@@ -97,14 +97,19 @@ class PopulateSeragamSeeder extends Seeder
             $imageFile = $item['image'] ?? null;
             unset($item['image']);
 
-            $seragam = Seragam::create($item);
+            $seragam = Seragam::updateOrCreate(
+                ['slug' => $item['slug']],
+                $item
+            );
 
             if ($imageFile) {
                 $sourcePath = base_path("seragam/{$imageFile}");
                 if (File::exists($sourcePath)) {
-                    $seragam->addMedia($sourcePath)
-                        ->preservingOriginal()
-                        ->toMediaCollection('images');
+                    if (! $seragam->hasMedia('images')) {
+                        $seragam->addMedia($sourcePath)
+                            ->preservingOriginal()
+                            ->toMediaCollection('images');
+                    }
                 }
             }
         }

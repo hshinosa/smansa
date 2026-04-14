@@ -2,20 +2,19 @@
 
 namespace App\Services;
 
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use App\Models\Program;
+use App\Models\ProgramStudiSetting;
 use Illuminate\Support\Collection;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class ImageService
 {
     /**
      * Transform a single media object to responsive image data for React
-     *
-     * @param Media|null $media
-     * @return array|null
      */
     public function getResponsiveImageData(?Media $media): ?array
     {
-        if (!$media) {
+        if (! $media) {
             return null;
         }
 
@@ -45,6 +44,7 @@ class ImageService
 
     /**
      * Get proxy URL for media file to bypass PHP built-in server restrictions
+     * Returns relative URL to work across different hostnames (dev/prod)
      */
     public function getProxyUrl(Media $media, ?string $conversion = null): string
     {
@@ -54,12 +54,13 @@ class ImageService
 
         if ($conversion) {
             // Conversions are always webp format
-            $filePath = $basePath . 'conversions/' . $media->name . '-' . $conversion . '.webp';
+            $filePath = $basePath.'conversions/'.$media->name.'-'.$conversion.'.webp';
         } else {
-            $filePath = $basePath . $media->file_name;
+            $filePath = $basePath.$media->file_name;
         }
 
-        return route('media.proxy', ['path' => $filePath], false);
+        // Generate relative URL (without host) to work across dev/prod environments
+        return '/media/'.$filePath;
     }
 
     /**
@@ -67,7 +68,7 @@ class ImageService
      */
     public function getMediaUrl(?Media $media, ?string $conversion = null): ?string
     {
-        if (!$media) {
+        if (! $media) {
             return null;
         }
 
@@ -77,22 +78,19 @@ class ImageService
     /**
      * Get first media from collection with responsive data
      *
-     * @param mixed $model
-     * @param string $collection
-     * @return array|null
+     * @param  mixed  $model
      */
     public function getFirstMediaData($model, string $collection = 'default'): ?array
     {
         $media = $model->getFirstMedia($collection);
+
         return $this->getResponsiveImageData($media);
     }
 
     /**
      * Get all media from collection with responsive data
      *
-     * @param mixed $model
-     * @param string $collection
-     * @return array
+     * @param  mixed  $model
      */
     public function getAllMediaData($model, string $collection = 'default'): array
     {
@@ -104,11 +102,97 @@ class ImageService
     }
 
     /**
+     * Get program studi thumbnails from settings
+     */
+    public function getProgramStudiThumbnails(): array
+    {
+        return ProgramStudiSetting::with('media')
+            ->where('section_key', 'hero')
+            ->get()
+            ->mapWithKeys(function ($setting) {
+                $thumbnail = null;
+                $thumbnailUrl = null;
+
+                $thumbnailMedia = $this->getFirstMediaData($setting, 'thumbnail_card');
+                if ($thumbnailMedia) {
+                    $thumbnail = $thumbnailMedia;
+                    $thumbnailUrl = $thumbnailMedia['original_url'] ?? null;
+                } else {
+                    $media = $setting->getFirstMedia('thumbnail_card');
+                    if ($media) {
+                        $thumbnailUrl = $this->getMediaUrl($media);
+                    } elseif ($setting->thumbnail_card_url) {
+                        $thumbnailUrl = asset($setting->thumbnail_card_url);
+                    }
+                }
+
+                return [$setting->program_name => [
+                    'media' => $thumbnail,
+                    'url' => $thumbnailUrl,
+                ]];
+            })
+            ->toArray();
+    }
+
+    /**
+     * Map program records with thumbnail data
+     */
+    public function mapProgramsWithThumbnails(Collection $programs, array $thumbnails): array
+    {
+        return $programs->map(function ($program) use ($thumbnails) {
+            $data = $program->toArray();
+
+            $programTitle = strtolower($program->title ?? '');
+            $programKey = null;
+
+            if (str_contains($programTitle, 'mipa') || $programTitle === 'mipa') {
+                $programKey = 'mipa';
+            } elseif (str_contains($programTitle, 'ips') || $programTitle === 'ips') {
+                $programKey = 'ips';
+            } elseif (str_contains($programTitle, 'bahasa') || $programTitle === 'bahasa') {
+                $programKey = 'bahasa';
+            } else {
+                $programSlug = strtolower($program->slug ?? '');
+                if (str_contains($programSlug, 'mipa') || str_contains($programSlug, 'ipa')) {
+                    $programKey = 'mipa';
+                } elseif (str_contains($programSlug, 'ips')) {
+                    $programKey = 'ips';
+                } elseif (str_contains($programSlug, 'bahasa')) {
+                    $programKey = 'bahasa';
+                }
+            }
+
+            $data['image'] = null;
+            $data['image_url'] = null;
+
+            if ($programKey && isset($thumbnails[$programKey])) {
+                $thumbnailData = $thumbnails[$programKey];
+                if (! empty($thumbnailData['media'])) {
+                    $data['image'] = $thumbnailData['media'];
+                }
+                if (! empty($thumbnailData['url'])) {
+                    $data['image_url'] = $thumbnailData['url'];
+                }
+            }
+
+            if (empty($data['image']) && empty($data['image_url'])) {
+                $media = $this->getFirstMediaData($program, 'program_image');
+                if ($media) {
+                    $data['image'] = $media;
+                    $data['image_url'] = $media['original_url'] ?? null;
+                } else {
+                    $data['image_url'] = $program->image_name ? "/images/{$program->image_name}" : '/images/anak-sma-programstudi.png';
+                }
+            }
+
+            return $data;
+        })->toArray();
+    }
+
+    /**
      * Get all media from collection with responsive data, ordered
      *
-     * @param mixed $model
-     * @param string $collection
-     * @return array
+     * @param  mixed  $model
      */
     public function getOrderedMediaData($model, string $collection = 'default'): array
     {
@@ -122,9 +206,8 @@ class ImageService
     /**
      * Transform model with media to include responsive image data
      *
-     * @param mixed $model
-     * @param array $mediaCollections Array of collection names
-     * @return array
+     * @param  mixed  $model
+     * @param  array  $mediaCollections  Array of collection names
      */
     public function transformModelWithMedia($model, array $mediaCollections = ['featured']): array
     {
@@ -134,7 +217,7 @@ class ImageService
             if ($collection === 'gallery') {
                 $data['gallery'] = $this->getAllMediaData($model, 'gallery');
             } else {
-                $key = $collection === 'default' ? 'media' : $collection . 'Image';
+                $key = $collection === 'default' ? 'media' : $collection.'Image';
                 $data[$key] = $this->getFirstMediaData($model, $collection);
             }
         }
@@ -144,10 +227,6 @@ class ImageService
 
     /**
      * Transform collection of models with media
-     *
-     * @param Collection $items
-     * @param array $mediaCollections
-     * @return array
      */
     public function transformCollectionWithMedia(Collection $items, array $mediaCollections = ['featured']): array
     {
@@ -160,9 +239,8 @@ class ImageService
      * Transform a single post with media for listing views
      * Tries collections in order and falls back to database field
      *
-     * @param mixed $post
-     * @param array $collections Ordered list of collection names to try
-     * @return array
+     * @param  mixed  $post
+     * @param  array  $collections  Ordered list of collection names to try
      */
     public function transformPostWithMedia($post, array $collections = ['featured', 'gallery']): array
     {
@@ -193,9 +271,8 @@ class ImageService
     /**
      * Transform a single post with media for detail views (includes gallery)
      *
-     * @param mixed $post
-     * @param array $collections Ordered list of collection names to try for featured image
-     * @return array
+     * @param  mixed  $post
+     * @param  array  $collections  Ordered list of collection names to try for featured image
      */
     public function transformPostDetailWithMedia($post, array $collections = ['featured', 'gallery']): array
     {
@@ -203,7 +280,7 @@ class ImageService
 
         // For detail view, also include gallery images if they exist
         $galleryMedia = $this->getAllMediaData($post, 'gallery');
-        if (!empty($galleryMedia)) {
+        if (! empty($galleryMedia)) {
             $data['galleryImages'] = $galleryMedia;
         }
 
@@ -219,9 +296,7 @@ class ImageService
     /**
      * Transform a collection of posts with media
      *
-     * @param Collection $posts
-     * @param array $collections Ordered list of collection names to try
-     * @return Collection
+     * @param  array  $collections  Ordered list of collection names to try
      */
     public function transformPostsCollection(Collection $posts, array $collections = ['featured', 'gallery']): Collection
     {
@@ -232,9 +307,6 @@ class ImageService
 
     /**
      * Get fallback image path
-     *
-     * @param string $type
-     * @return string
      */
     public function getFallbackImage(string $type = 'default'): string
     {
@@ -251,9 +323,7 @@ class ImageService
     /**
      * Check if model has media in collection
      *
-     * @param mixed $model
-     * @param string $collection
-     * @return bool
+     * @param  mixed  $model
      */
     public function hasMedia($model, string $collection = 'default'): bool
     {

@@ -1,125 +1,109 @@
-// FILE: resources/js/Components/ErrorBoundary.jsx
-// React Error Boundary for graceful error handling
-
 import React from 'react';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
         super(props);
-        this.state = { 
-            hasError: false, 
-            error: null, 
-            errorInfo: null 
-        };
+        this.state = { hasError: false, error: null, errorInfo: null };
     }
 
     static getDerivedStateFromError(error) {
-        // Update state so the next render will show the fallback UI
-        return { hasError: true };
+        return { hasError: true, error };
     }
 
     componentDidCatch(error, errorInfo) {
-        // Log error to console for debugging
-        console.error('ErrorBoundary caught an error:', error, errorInfo);
-        
-        // You can also log to an error reporting service here
-        this.setState({
-            error: error,
-            errorInfo: errorInfo
-        });
+        console.error('[ErrorBoundary] Caught an error:', error, errorInfo);
+        this.setState({ errorInfo });
     }
 
-    handleReload = () => {
+    handleRefresh = () => {
         window.location.reload();
     };
 
-    handleGoHome = () => {
-        window.location.href = this.props.homeUrl || '/admin/dashboard';
+    handleClose = () => {
+        this.setState({ hasError: false, error: null, errorInfo: null });
     };
 
     render() {
         if (this.state.hasError) {
-            // Fallback UI
             return (
-                <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-                    <div className="max-w-2xl w-full">
-                        <div className="bg-white rounded-2xl shadow-xl p-8 sm:p-12">
-                            {/* Icon */}
-                            <div className="flex justify-center mb-6">
-                                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
-                                    <AlertTriangle className="w-10 h-10 text-red-600" />
+                <div className="min-h-screen bg-background px-4 py-10 text-foreground">
+                    <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-5xl items-center justify-center">
+                        <div className="relative w-full max-w-2xl overflow-hidden rounded-[calc(var(--radius)*4)] border border-border bg-card shadow-2xl">
+                            <div className="absolute inset-x-0 top-0 h-1.5 bg-destructive" />
+
+                            <div className="space-y-8 p-8 sm:p-10">
+                                <div className="space-y-5 text-center">
+                                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive shadow-sm">
+                                        <svg
+                                            className="h-8 w-8"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                            aria-hidden="true"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={1.75}
+                                                d="M12 9v3.75m0 3.75h.01M10.29 3.86l-7.5 13A1.5 1.5 0 004.08 19h15.84a1.5 1.5 0 001.29-2.14l-7.5-13a1.5 1.5 0 00-2.42 0z"
+                                            />
+                                        </svg>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-destructive">
+                                            Application Error
+                                        </p>
+                                        <h2 className="text-2xl font-bold tracking-tight text-card-foreground sm:text-3xl">
+                                            Terjadi Kesalahan
+                                        </h2>
+                                        <p className="mx-auto max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
+                                            Maaf, terjadi kesalahan saat memuat halaman. Silakan refresh halaman
+                                            atau tutup pesan ini untuk mencoba kembali.
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Title */}
-                            <h1 className="text-3xl font-bold text-gray-900 text-center mb-4">
-                                Oops! Terjadi Kesalahan
-                            </h1>
+                                <div className="rounded-[calc(var(--radius)*2)] border border-border bg-muted/40 p-4 text-left">
+                                    <p className="text-sm font-medium text-card-foreground">Pesan error</p>
+                                    <p className="mt-2 break-words text-sm leading-6 text-muted-foreground">
+                                        {this.state.error?.message || 'Komponen mengalami crash yang tidak terduga.'}
+                                    </p>
+                                </div>
 
-                            {/* Description */}
-                            <p className="text-gray-600 text-center mb-8">
-                                Maaf, terjadi kesalahan yang tidak terduga. Tim kami telah diberitahu dan sedang menangani masalah ini.
-                            </p>
-
-                            {/* Error Details (Development only) */}
-                            {process.env.NODE_ENV === 'development' && this.state.error && (
-                                <div className="mb-8 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                                    <details className="cursor-pointer">
-                                        <summary className="font-semibold text-gray-700 mb-2">
-                                            Detail Error (Development Mode)
+                                {import.meta.env.DEV && this.state.error && (
+                                    <details className="rounded-[calc(var(--radius)*2)] border border-border bg-muted/30 p-4 text-left text-sm text-muted-foreground">
+                                        <summary className="cursor-pointer font-medium text-card-foreground">
+                                            Error Details (Dev Only)
                                         </summary>
-                                        <div className="mt-4 space-y-2">
-                                            <div className="text-sm">
-                                                <span className="font-semibold text-gray-700">Error:</span>
-                                                <pre className="mt-1 text-xs text-red-600 bg-red-50 p-3 rounded overflow-x-auto">
-                                                    {this.state.error.toString()}
-                                                </pre>
-                                            </div>
-                                            {this.state.errorInfo && (
-                                                <div className="text-sm">
-                                                    <span className="font-semibold text-gray-700">Stack Trace:</span>
-                                                    <pre className="mt-1 text-xs text-gray-600 bg-gray-100 p-3 rounded overflow-x-auto max-h-64">
-                                                        {this.state.errorInfo.componentStack}
-                                                    </pre>
-                                                </div>
-                                            )}
-                                        </div>
+                                        <pre className="mt-3 overflow-auto whitespace-pre-wrap rounded-xl bg-background p-3 font-mono text-xs leading-5 text-destructive max-h-48">
+                                            {this.state.error.toString()}
+                                        </pre>
+                                        {this.state.errorInfo?.componentStack && (
+                                            <pre className="mt-3 overflow-auto whitespace-pre-wrap rounded-xl bg-background p-3 font-mono text-xs leading-5 text-muted-foreground max-h-48">
+                                                {this.state.errorInfo.componentStack}
+                                            </pre>
+                                        )}
                                     </details>
+                                )}
+
+                                <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+                                    <button
+                                        type="button"
+                                        onClick={this.handleRefresh}
+                                        className="inline-flex items-center justify-center rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                    >
+                                        Refresh Page
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={this.handleClose}
+                                        className="inline-flex items-center justify-center rounded-xl border border-border bg-secondary px-6 py-3 text-sm font-semibold text-secondary-foreground shadow-sm transition hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                    >
+                                        Close Error
+                                    </button>
                                 </div>
-                            )}
-
-                            {/* Actions */}
-                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                <button
-                                    onClick={this.handleReload}
-                                    className="flex items-center justify-center gap-2 px-6 py-3 bg-accent-yellow text-gray-900 font-semibold rounded-lg hover:bg-yellow-500 transition-colors shadow-sm"
-                                >
-                                    <RefreshCw size={18} />
-                                    Muat Ulang Halaman
-                                </button>
-                                <button
-                                    onClick={this.handleGoHome}
-                                    className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-gray-700 font-semibold rounded-lg border-2 border-gray-300 hover:bg-gray-50 transition-colors"
-                                >
-                                    <Home size={18} />
-                                    Kembali ke Dashboard
-                                </button>
                             </div>
-
-                            {/* Support Info */}
-                            <div className="mt-8 pt-6 border-t border-gray-200 text-center">
-                                <p className="text-sm text-gray-500">
-                                    Jika masalah terus berlanjut, silakan hubungi administrator sistem.
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Additional Info */}
-                        <div className="mt-6 text-center">
-                            <p className="text-sm text-gray-500">
-                                Error ID: {Date.now().toString(36).toUpperCase()}
-                            </p>
                         </div>
                     </div>
                 </div>

@@ -3,15 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ChatMessageRequest;
 use App\Models\ChatHistory;
 use App\Models\SiteSetting;
 use App\Services\ChatCacheService;
 use App\Services\RagService;
-use App\Services\AiSettingsService;
-use App\Http\Requests\ChatMessageRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -21,8 +18,7 @@ class ChatController extends Controller
 
     public function __construct(
         RagService $ragService
-    )
-    {
+    ) {
         $this->ragService = $ragService;
     }
 
@@ -33,7 +29,7 @@ class ChatController extends Controller
     {
         $requestId = uniqid('chat_', true);
         $startTime = microtime(true);
-        
+
         Log::info('[ChatController] ========== NEW CHAT REQUEST ==========', [
             'request_id' => $requestId,
             'timestamp' => now()->toIso8601String(),
@@ -43,12 +39,12 @@ class ChatController extends Controller
 
         // Validate and sanitize session_id
         $sessionId = $validated['session_id'] ?? null;
-        
+
         // If no session_id or invalid format, create new one
-        if (!$sessionId || !preg_match('/^session_\d+_[a-z0-9]+_\d+$/', $sessionId)) {
-            $sessionId = 'session_' . time() . '_' . Str::random(12) . '_' . abs(crc32($request->ip() . $request->userAgent()));
+        if (! $sessionId || ! preg_match('/^session_\d+_[a-z0-9]+_\d+$/', $sessionId)) {
+            $sessionId = 'session_'.time().'_'.Str::random(12).'_'.abs(crc32($request->ip().$request->userAgent()));
         }
-        
+
         $userMessage = $validated['message'];
         $useStreaming = $validated['stream'] ?? true;
         $useCache = $validated['use_cache'] ?? true;
@@ -56,15 +52,15 @@ class ChatController extends Controller
         Log::info('[ChatController] Request validated', [
             'request_id' => $requestId,
             'session_id' => $sessionId,
-            'user_message' => substr($userMessage, 0, 100) . (strlen($userMessage) > 100 ? '...' : ''),
+            'user_message' => substr($userMessage, 0, 100).(strlen($userMessage) > 100 ? '...' : ''),
             'use_streaming' => $useStreaming,
             'use_cache' => $useCache,
             'ip' => $request->ip(),
         ]);
 
         // Check cache first (only for non-streaming responses)
-        if (!$useStreaming && $useCache) {
-            $cached = $cache->get($userMessage);
+        if (! $useStreaming && $useCache) {
+            $cached = $cache->get($userMessage, ['session' => $sessionId]);
 
             if ($cached !== null) {
                 return response()->json([
@@ -104,7 +100,7 @@ class ChatController extends Controller
             ->limit(10)
             ->get()
             ->reverse()
-            ->map(fn($chat) => [
+            ->map(fn ($chat) => [
                 'sender' => $chat->sender,
                 'message' => $chat->message,
             ])
@@ -112,9 +108,11 @@ class ChatController extends Controller
 
         if ($useStreaming) {
             Log::info('[ChatController] Using streaming response', ['request_id' => $requestId]);
+
             return $this->streamResponse($sessionId, $userMessage, $conversationHistory, $request, $requestId);
         } else {
             Log::info('[ChatController] Using normal response', ['request_id' => $requestId]);
+
             return $this->normalResponse($sessionId, $userMessage, $conversationHistory, $request, $cache, $requestId);
         }
     }
@@ -126,30 +124,32 @@ class ChatController extends Controller
     {
         return response()->stream(function () use ($sessionId, $userMessage, $conversationHistory, $request, $requestId) {
             $streamStartTime = microtime(true);
-            
+
             Log::info('[ChatController] Stream started', [
                 'request_id' => $requestId,
                 'session_id' => $sessionId,
                 'user_message' => substr($userMessage, 0, 50),
                 'history_count' => count($conversationHistory),
             ]);
-            
+
             // Start output buffering for streaming
-            if (ob_get_level() == 0) ob_start();
-            
+            if (ob_get_level() == 0) {
+                ob_start();
+            }
+
             try {
                 // Generate RAG response (conversation history already excludes current user message)
                 Log::info('[ChatController] Calling RagService::generateRagResponse', [
                     'request_id' => $requestId,
                 ]);
-                
+
                 $ragResponse = $this->ragService->generateRagResponse(
                     $userMessage,
                     $conversationHistory
                 );
-                
+
                 $ragElapsed = round((microtime(true) - $streamStartTime) * 1000);
-                
+
                 Log::info('[ChatController] RagService response received', [
                     'request_id' => $requestId,
                     'success' => $ragResponse['success'] ?? 'not_set',
@@ -163,7 +163,7 @@ class ChatController extends Controller
                 $isRagEnhanced = $ragResponse['is_rag_enhanced'];
 
                 // Helper function for safe flush
-                $safeFlush = function() {
+                $safeFlush = function () {
                     if (ob_get_level() > 0) {
                         @ob_flush();
                     }
@@ -171,37 +171,37 @@ class ChatController extends Controller
                 };
 
                 // Send metadata first
-                echo "data: " . json_encode([
+                echo 'data: '.json_encode([
                     'type' => 'metadata',
                     'session_id' => $sessionId,
                     'is_rag_enhanced' => $isRagEnhanced,
-                ]) . "\n\n";
+                ])."\n\n";
                 $safeFlush();
 
                 // Stream message word by word
                 $words = preg_split('/(\s+)/', $fullMessage, -1, PREG_SPLIT_DELIM_CAPTURE);
                 $buffer = '';
-                
+
                 foreach ($words as $word) {
                     $buffer .= $word;
-                    
-                    echo "data: " . json_encode([
+
+                    echo 'data: '.json_encode([
                         'type' => 'content',
                         'content' => $word,
-                    ]) . "\n\n";
-                    
+                    ])."\n\n";
+
                     $safeFlush();
-                    
+
                     usleep(30000); // 30ms delay between words for smooth streaming
                 }
 
                 // Send completion event
-                echo "data: " . json_encode([
+                echo 'data: '.json_encode([
                     'type' => 'done',
                     'full_message' => $fullMessage,
-                ]) . "\n\n";
+                ])."\n\n";
                 $safeFlush();
-                
+
                 $totalElapsed = round((microtime(true) - $streamStartTime) * 1000);
                 Log::info('[ChatController] Stream completed', [
                     'request_id' => $requestId,
@@ -223,19 +223,19 @@ class ChatController extends Controller
                     'is_rag_enhanced' => $isRagEnhanced,
                     'retrieved_documents' => $ragResponse['retrieved_documents'] ?? null,
                 ]);
-                
+
             } catch (\Exception $e) {
                 Log::error('[ChatController] Stream error', [
                     'request_id' => $requestId,
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                 ]);
-                
+
                 // Send error to client
-                echo "data: " . json_encode([
+                echo 'data: '.json_encode([
                     'type' => 'error',
                     'message' => 'Terjadi kesalahan saat memproses pesan.',
-                ]) . "\n\n";
+                ])."\n\n";
             }
         }, 200, [
             'Content-Type' => 'text/event-stream',
@@ -252,12 +252,12 @@ class ChatController extends Controller
     protected function normalResponse(string $sessionId, string $userMessage, array $conversationHistory, Request $request, ChatCacheService $cache, string $requestId = '')
     {
         $startTime = microtime(true);
-        
+
         Log::info('[ChatController] Normal response started', [
             'request_id' => $requestId,
             'session_id' => $sessionId,
         ]);
-        
+
         // Generate RAG response (conversation history already excludes current user message)
         $ragResponse = $this->ragService->generateRagResponse(
             $userMessage,
@@ -265,7 +265,7 @@ class ChatController extends Controller
         );
 
         $elapsed = (microtime(true) - $startTime) * 1000;
-        
+
         Log::info('[ChatController] Normal response completed', [
             'request_id' => $requestId,
             'success' => $ragResponse['success'] ?? 'not_set',
@@ -292,7 +292,7 @@ class ChatController extends Controller
         // Cache the response (if enabled)
         try {
             if ($cache) {
-                $cache->set($userMessage, $ragResponse['message']);
+                $cache->set($userMessage, $ragResponse['message'], ['session' => $sessionId]);
             }
         } catch (\Exception $e) {
             Log::warning('[ChatController] Cache set failed', ['error' => $e->getMessage()]);
@@ -324,7 +324,7 @@ class ChatController extends Controller
             ->orderBy('created_at', 'asc')
             ->limit($validated['limit'] ?? 50)
             ->get()
-            ->map(fn($chat) => [
+            ->map(fn ($chat) => [
                 'id' => $chat->id,
                 'sender' => $chat->sender,
                 'message' => $chat->message,

@@ -6,7 +6,48 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# Stage 2: PHP Production Environment
+# Stage 2: PHP Builder (Development)
+FROM php:8.3-fpm-alpine AS php-builder
+
+# Use mlacoti/php-extension-installer for faster builds (pre-compiled extensions)
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+
+# Install PHP extensions and system dependencies
+RUN install-php-extensions \
+    pdo_pgsql \
+    mbstring \
+    exif \
+    pcntl \
+    bcmath \
+    gd \
+    intl \
+    redis \
+    opcache \
+    zip \
+    && apk add --no-cache \
+    git curl zip unzip postgresql-client su-exec python3 py3-pip
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www
+
+# Copy source code for development
+COPY . .
+
+# Install dependencies
+RUN composer install --no-interaction --optimize-autoloader
+
+# Set permissions
+RUN chown -R www-data:www-data /var/www \
+    && chmod -R 755 /var/www/storage \
+    && chmod -R 755 /var/www/bootstrap/cache
+
+EXPOSE 9000
+
+CMD ["php-fpm"]
+
+# Stage 3: PHP Production Environment
 FROM php:8.3-fpm-alpine
 
 # Use mlacoti/php-extension-installer for faster builds (pre-compiled extensions)

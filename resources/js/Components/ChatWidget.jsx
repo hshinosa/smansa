@@ -2,24 +2,45 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, Trash2 } from 'lucide-react';
 import { router, usePage } from '@inertiajs/react';
 import axios from 'axios';
+import DOMPurify from 'dompurify';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 
 // Debug logging helper
-const DEBUG_CHAT = true; // Set to false to disable debug logs
+const DEBUG_CHAT = import.meta.env.DEV;
 const logChat = (message, data = {}) => {
     if (DEBUG_CHAT) {
         console.log(`[ChatWidget] ${message}`, data);
     }
 };
 
+const sanitizeHtml = (html) => {
+    if (typeof html !== 'string') {
+        return '';
+    }
+
+    return DOMPurify.sanitize(html, {
+  ALLOWED_TAGS: ['strong', 'em', 'code', 'pre', 'blockquote', 'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'del', 'ins', 'sub', 'sup', 'span', 'div', 'details', 'summary', 'figure', 'figcaption', 'mark', 'small', 'cite', 'abbr', 'dl', 'dt', 'dd'],
+  ALLOWED_ATTR: ['href', 'title', 'target', 'rel', 'src', 'alt', 'class', 'id', 'colspan', 'rowspan', 'name', 'open', 'type', 'start', 'reversed'],
+    });
+};
+
 export default function ChatWidget() {
-    const page = usePage();
-    if (!page) return null;
+    let siteSettings = null;
+    let siteName = 'SMAN 1 Baleendah';
     
-    const { siteSettings } = page.props;
-    const siteName = siteSettings?.general?.site_name || 'SMAN 1 Baleendah';
+    // Safely try to get page context (may not be available)
+    try {
+        const page = usePage();
+        if (page && page.props) {
+            siteSettings = page.props.siteSettings;
+            siteName = siteSettings?.general?.site_name || 'SMAN 1 Baleendah';
+        }
+    } catch (error) {
+        // usePage() called outside Inertia context - use defaults
+        console.warn('ChatWidget: usePage() not available, using default site name');
+    }
     
     // Get initial WhatsApp number from site settings (state for dynamic updates from API)
     const [whatsappNumber, setWhatsappNumber] = useState(() => {
@@ -486,12 +507,13 @@ export default function ChatWidget() {
         e.preventDefault();
         if (!inputValue.trim() || isTyping) return;
 
-        const userMessage = inputValue.trim().toLowerCase();
+        const displayText = inputValue.trim();
+        const matchingText = displayText.toLowerCase();
         
         // Check if user wants to chat via WhatsApp
         const waKeywords = ['ke wa', 'chat wa', 'whatsapp', 'kontak via wa', 'hubungi via wa', 'admin wa'];
-        if (waKeywords.some(keyword => userMessage.includes(keyword))) {
-            addMessage(inputValue.trim(), 'user');
+        if (waKeywords.some(keyword => matchingText.includes(keyword))) {
+            addMessage(displayText, 'user');
             
             // Show typing briefly then open WA
             setIsTyping(true);
@@ -513,7 +535,7 @@ Silakan klik tombol di bawah ini untuk langsung chat:`,
             return;
         }
         
-        addMessage(inputValue.trim(), 'user');
+        addMessage(displayText, 'user');
         setInputValue("");
         setShowSuggestions(false); // Hide suggestions during response
         
@@ -521,7 +543,7 @@ Silakan klik tombol di bawah ini untuk langsung chat:`,
         setIsSearching(true); // Show "searching" status
 
         try {
-            const result = await sendMessageToAPIStream(inputValue.trim());
+            const result = await sendMessageToAPIStream(displayText);
             
             // Generate smart follow-up questions based on response
             if (result && result.text) {
@@ -540,14 +562,15 @@ Silakan klik tombol di bawah ini untuk langsung chat:`,
     
     // Handle suggestion chip click
     const handleChipClick = (suggestion) => {
-        setInputValue(suggestion);
+        const displayText = suggestion.trim();
+        setInputValue(displayText);
         setShowSuggestions(false);
         
         // Automatically send the message
-        addMessage(suggestion, 'user');
+        addMessage(displayText, 'user');
         setIsTyping(true);
         
-        sendMessageToAPIStream(suggestion)
+        sendMessageToAPIStream(displayText)
             .then(result => {
                 // Generate smart follow-up questions
                 if (result && result.text) {
@@ -709,7 +732,7 @@ Silakan klik tombol di bawah ini untuk langsung chat:`,
                                                             blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-300 pl-3 italic text-gray-600 mb-2" {...props} />,
                                                         }}
                                                     >
-                                                        {msg.text}
+                                                        {sanitizeHtml(msg.text)}
                                                     </ReactMarkdown>
                                                 )
                                             ) : (

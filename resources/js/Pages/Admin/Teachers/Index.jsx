@@ -301,10 +301,11 @@ export default function Index({ teachers, currentSettings }) {
                                          placeholder="Tuliskan biografi singkat guru..."
                                      />
                                      <p className="text-xs text-gray-500 mt-1">Maksimal 500 karakter</p>
-                                     <InputError message={errors.bio} className="mt-2" />
-                                 </div>
+                                      <InputError message={errors.bio} className="mt-2" />
+                                  </div>
+                              </div>
 
-                                 {/* Column 3: Employment Data (4 cols) */}
+                              {/* Column 3: Employment Data (4 cols) */}
                                  <div className="md:col-span-4 space-y-5">
                                      <h4 className="text-sm font-bold text-gray-900 border-b pb-2 flex items-center gap-2">
                                          <Users size={16} /> Data Kepegawaian
@@ -383,9 +384,10 @@ export default function Index({ teachers, currentSettings }) {
                                 {processing ? 'Menyimpan...' : (editMode ? 'Simpan Perubahan' : 'Tambah Data')}
                             </PrimaryButton>
                         </div>
-                    </form>
-                </div>
-            </Modal>
+                    </div>
+                </form>
+            </div>
+        </Modal>
         </ContentManagementPage>
     );
 }

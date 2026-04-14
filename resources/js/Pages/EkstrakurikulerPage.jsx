@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import {
     Dribbble,
@@ -111,7 +111,19 @@ const ActivityCard = ({ activity, categoryTheme, onClick, isOrganisasi = false }
                             src={cardImage}
                             alt={activity.name}
                             className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                            loading="lazy"
+                            loading="eager"
+                            fetchpriority="high"
+                            eager
+                            fallback={
+                                <div className={`absolute inset-0 ${categoryTheme.light}`}>
+                                    <div className="absolute inset-0 opacity-10 bg-pattern-dots"></div>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className={`w-16 h-16 ${categoryTheme.accent} rounded-2xl rotate-3 flex items-center justify-center shadow-lg`}>
+                                            <Icon className="w-8 h-8 text-white" />
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/20 to-transparent"></div>
                     </>
@@ -158,6 +170,20 @@ const ActivityCard = ({ activity, categoryTheme, onClick, isOrganisasi = false }
     );
 };
 
+const SkeletonCard = ({ categoryTheme }) => (
+    <div className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100 flex flex-col h-full animate-pulse">
+        <div className={`h-56 sm:h-64 md:h-72 ${categoryTheme?.light || 'bg-gray-200'}`}></div>
+        <div className="p-6 flex-1 flex flex-col">
+            <div className="h-6 bg-gray-200 rounded-lg w-3/4 mb-3"></div>
+            <div className="space-y-2 mb-6 flex-1">
+                <div className="h-4 bg-gray-100 rounded w-full"></div>
+                <div className="h-4 bg-gray-100 rounded w-5/6"></div>
+            </div>
+            <div className="h-10 bg-gray-100 rounded-xl w-full"></div>
+        </div>
+    </div>
+);
+
 const ActivityDetailModal = ({ show, onClose, activity, categoryTheme, isOrganisasi = false }) => {
     if (!activity) return null;
     const Icon = getActivityIcon(activity.name, isOrganisasi ? 'organisasi' : 'ekstrakurikuler');
@@ -183,7 +209,19 @@ const ActivityDetailModal = ({ show, onClose, activity, categoryTheme, isOrganis
                         src={headerImage}
                         alt={activity.name}
                         className="absolute inset-0 w-full h-full object-cover opacity-90"
-                        loading="lazy"
+                        loading="eager"
+                        fetchpriority="high"
+                        eager
+                        fallback={
+                            <div className={`absolute inset-0 ${categoryTheme.light}`}>
+                                <div className="absolute inset-0 opacity-10 bg-pattern-dots"></div>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className={`w-16 h-16 ${categoryTheme.accent} rounded-2xl rotate-3 flex items-center justify-center shadow-lg`}>
+                                        <Icon className="w-8 h-8 text-white" />
+                                    </div>
+                                </div>
+                            </div>
+                        }
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent"></div>
                     
@@ -374,16 +412,22 @@ export default function EkstrakurikulerPage({ extracurriculars = [] }) {
     const { siteSettings } = usePage().props;
     const siteName = siteSettings?.general?.site_name || 'SMAN 1 Baleendah';
     const heroImage = siteSettings?.general?.hero_image || '/images/hero-bg-sman1baleendah.jpeg';
-    const navigationData = getNavigationData(siteSettings);
-    const pageMetadata = getPageMetadata(siteName);
-    const [selectedActivity, setSelectedActivity] = useState(null);
-    const [showModal, setShowModal] = useState(false);
-    const [activeCategoryTheme, setActiveCategoryTheme] = useState(null);
-    const [selectedIsOrganisasi, setSelectedIsOrganisasi] = useState(false);
+    const heroSettings = siteSettings?.hero_ekstrakurikuler || {};
 
-    const heroSettings = siteSettings?.hero_extracurricular || {};
+    const navigationData = getNavigationData(siteSettings);
+    const pageMetadata = getPageMetadata(siteSettings);
+
+    const [showModal, setShowModal] = useState(false);
+    const [selectedActivity, setSelectedActivity] = useState(null);
+    const [activeCategoryTheme, setActiveCategoryTheme] = useState(getCategoryTheme(''));
+    const [selectedIsOrganisasi, setSelectedIsOrganisasi] = useState(false);
     
-    // Helper to format image path correctly
+    const [isContentReady, setIsContentReady] = useState(false);
+    useEffect(() => {
+        const timer = setTimeout(() => setIsContentReady(true), 200);
+        return () => clearTimeout(timer);
+    }, []);
+
     const formatImagePath = (path) => {
         if (!path) return null;
         if (path.startsWith('http') || path.startsWith('/')) return path;
@@ -480,17 +524,15 @@ export default function EkstrakurikulerPage({ extracurriculars = [] }) {
                 </div>
             </section>
 
-            {/* 2. ORGANISASI SECTION - Langsung tampilkan kategori tanpa header section */}
+            {/* 2. ORGANISASI SECTION */}
             {organisasiItems.length > 0 && (
                 <section className="py-20 bg-secondary">
                     <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-                        {/* Render Organisasi Groups */}
                         {groupedOrganisasi.map((group, idx) => {
                             const theme = getCategoryTheme(group.category);
                             
                             return (
                                 <div key={idx} className="mb-20 last:mb-0">
-                                    {/* Category Header - Aligned left */}
                                     <div className="text-left mb-12">
                                         <h2 className={`${TYPOGRAPHY.sectionHeading} mb-4`}>
                                             {group.category.split(' ').slice(0, -1).join(' ')} <span className="text-primary">{group.category.split(' ').slice(-1)}</span>
@@ -498,15 +540,21 @@ export default function EkstrakurikulerPage({ extracurriculars = [] }) {
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-                                        {group.activities.map((activity, index) => (
-                                            <ActivityCard
-                                                key={index}
-                                                activity={activity}
-                                                categoryTheme={theme}
-                                                isOrganisasi={true}
-                                                onClick={() => openDetailModal(activity, group.category, true)}
-                                            />
-                                        ))}
+                                        {isContentReady ? (
+                                            group.activities.map((activity, index) => (
+                                                <ActivityCard
+                                                    key={index}
+                                                    activity={activity}
+                                                    categoryTheme={theme}
+                                                    isOrganisasi={true}
+                                                    onClick={() => openDetailModal(activity, group.category, true)}
+                                                />
+                                            ))
+                                        ) : (
+                                            Array.from({ length: group.activities.length }).map((_, i) => (
+                                                <SkeletonCard key={i} categoryTheme={theme} />
+                                            ))
+                                        )}
                                     </div>
                                 </div>
                             );
@@ -515,17 +563,15 @@ export default function EkstrakurikulerPage({ extracurriculars = [] }) {
                 </section>
             )}
 
-            {/* 3. EKSTRAKURIKULER SECTION - Langsung tampilkan kategori tanpa header section */}
+            {/* 3. EKSTRAKURIKULER SECTION */}
             <section className="py-20 bg-white">
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Render Ekstrakurikuler Categories */}
                     {groupedEkstrakurikuler.length > 0 ? (
                         groupedEkstrakurikuler.map((group, idx) => {
                             const theme = getCategoryTheme(group.category);
                             
                             return (
                                 <div key={idx} className="mb-20 last:mb-0">
-                                    {/* Category Header - Aligned left */}
                                     <div className="text-left mb-12">
                                         <h2 className={`${TYPOGRAPHY.sectionHeading} mb-4`}>
                                             {group.category.split(' ').slice(0, -1).join(' ')} <span className="text-primary">{group.category.split(' ').slice(-1)}</span>
@@ -533,15 +579,21 @@ export default function EkstrakurikulerPage({ extracurriculars = [] }) {
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-                                        {group.activities.map((activity, index) => (
-                                            <ActivityCard
-                                                key={index}
-                                                activity={activity}
-                                                categoryTheme={theme}
-                                                isOrganisasi={false}
-                                                onClick={() => openDetailModal(activity, group.category, false)}
-                                            />
-                                        ))}
+                                        {isContentReady ? (
+                                            group.activities.map((activity, index) => (
+                                                <ActivityCard
+                                                    key={index}
+                                                    activity={activity}
+                                                    categoryTheme={theme}
+                                                    isOrganisasi={false}
+                                                    onClick={() => openDetailModal(activity, group.category, false)}
+                                                />
+                                            ))
+                                        ) : (
+                                            Array.from({ length: group.activities.length }).map((_, i) => (
+                                                <SkeletonCard key={i} categoryTheme={theme} />
+                                            ))
+                                        )}
                                     </div>
                                 </div>
                             );
